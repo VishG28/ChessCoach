@@ -18,13 +18,7 @@ import { useExplain } from '@/coaching/useExplain'
 import type { BlunderContext } from '@/coaching/llmCoach'
 import { useEngine, parseUciMove } from '@/engine/engine'
 import { useChessGame } from '@/lib/useChessGame'
-import {
-  depthFromElo,
-  movetimeFromElo,
-  randomnessFromElo,
-  useMultiPV,
-} from '@/engine/eloCurves'
-import type { TopCandidate } from '@/engine/types'
+import { getWeakeningParams, humanThinkDelay, selectMove } from '@/engine/weakening'
 import { useGameLogger } from '@/games/useGameLogger'
 
 /** Convert a UCI move to SAN given a FEN. Returns UCI string unchanged on failure. */
@@ -49,16 +43,6 @@ function resolveUserColor(choice: UserColor): 'white' | 'black' {
   return choice
 }
 
-function weightedPick<T>(items: T[], weights: number[]): T {
-  const total = weights.slice(0, items.length).reduce((a, b) => a + b, 0)
-  let r = Math.random() * total
-  for (let i = 0; i < items.length; i++) {
-    r -= weights[i] ?? 0
-    if (r <= 0) return items[i]
-  }
-  return items[items.length - 1]
-}
-
 export function PlayPage() {
   const game = useChessGame()
   const { engine, ready } = useEngine()
@@ -68,6 +52,7 @@ export function PlayPage() {
   const [colorChoice, setColorChoice] = useState<UserColor>(DEFAULT_USER_COLOR)
   const [coachMode, setCoachMode] = useState<CoachMode>(DEFAULT_COACH_MODE)
   const [debugOpen, setDebugOpen] = useState(false)
+  const [engineThinking, setEngineThinking] = useState(false)
 
   const userColor: Color = game.orientation === 'white' ? 'w' : 'b'
 
@@ -204,52 +189,60 @@ export function PlayPage() {
     if (game.turn !== engineColor) return
 
     const requestId = ++engineRequestIdRef.current
-    const depth = depthFromElo(elo)
-    const movetime = movetimeFromElo(elo)
-    const multipvEnabled = useMultiPV(elo)
-    const multipv = multipvEnabled ? 5 : 1
-    const randomness = randomnessFromElo(elo)
+    const params = getWeakeningParams(elo)
+    const evalCp = coach.liveEval?.cp
+    const fenBefore = game.fen
 
+    setEngineThinking(true)
     void (async () => {
       try {
+        const startedAt = performance.now()
         const move = await engine.requestMove({
-          fen: game.fen,
-          depth,
-          movetime,
-          multipv,
+          fen: fenBefore,
+          depth: params.depth,
+          movetime: params.movetime,
+          multipv: params.multipv,
         })
         if (engineRequestIdRef.current !== requestId) return
 
-        let chosen = move
+        const fallbackUci = `${move.from}${move.to}${move.promotion ?? ''}`
+        const candidates =
+          move.topCandidates && move.topCandidates.length > 0
+            ? move.topCandidates
+            : [{ move: fallbackUci, cp: 0, pv: [] }]
 
-        // Apply weighted-random candidate selection at low Elo
-        if (
-          multipvEnabled &&
-          move.topCandidates &&
-          move.topCandidates.length > 1 &&
-          Math.random() < randomness
-        ) {
-          const cands = move.topCandidates.slice(0, 5) as TopCandidate[]
-          const weights = [5, 4, 3, 2, 1].slice(0, cands.length)
-          const pick = weightedPick(cands, weights)
-          chosen = parseUciMove(pick.move)
-        }
+        const result = selectMove({
+          candidates,
+          randomMoveChance: params.randomMoveChance,
+          blunderChance: params.blunderChance,
+          fenBefore,
+          eloForSanity: elo,
+          evalCp,
+        })
 
+        // Wait for human-feel think time, measured from request start.
+        const elapsed = performance.now() - startedAt
+        const wait = Math.max(0, humanThinkDelay() - elapsed)
+        if (wait > 0) await new Promise((r) => setTimeout(r, wait))
+        if (engineRequestIdRef.current !== requestId) return
+
+        const chosen = parseUciMove(result.uci)
         game.makeMove({
           from: chosen.from as Square,
           to: chosen.to as Square,
           promotion: chosen.promotion,
         })
 
-        // Record SAN for the debug overlay after the move is applied
         const lastEntry = game.history[game.history.length - 1]
-        const uciStr = `${chosen.from}${chosen.to}${chosen.promotion ?? ''}`
         if (lastEntry && engine) {
-          engine.recordEngineMoveSan(uciStr, lastEntry.san)
+          engine.recordEngineMoveSan(result.uci, lastEntry.san)
+          engine.recordRoll(result.uci, result.roll, result.cpBest)
         }
       } catch {
         // Engine disposed mid-request, or transport error. Silent fail —
         // the position will retry on the next render cycle.
+      } finally {
+        if (engineRequestIdRef.current === requestId) setEngineThinking(false)
       }
     })()
     // `game` is intentionally omitted: it's a new object every render and
@@ -342,6 +335,7 @@ export function PlayPage() {
             captures={coach.captures}
             blunderAlert={coach.blunderAlert}
             thinking={coach.thinking}
+            engineThinking={engineThinking}
             onDismissAlert={coach.dismissAlert}
             onTakeBackBlunder={handleTakeBack}
             explain={explain}

@@ -111,6 +111,17 @@ export class Engine {
     this.updateDebug({ recentMoves: moves })
   }
 
+  recordRoll(
+    uci: string,
+    roll: 'best' | 'random' | 'blunder' | 'filtered',
+    cpBest: number,
+  ): void {
+    const moves = this.debugState.recentMoves.map((m) =>
+      m.uci === uci && m.roll === undefined ? { ...m, roll, cpBest } : m,
+    )
+    this.updateDebug({ recentMoves: moves })
+  }
+
   private updateDebug(patch: Partial<EngineDebugState>): void {
     this.debugState = { ...this.debugState, ...patch }
     const snapshot = this.getDebugState()

@@ -22,6 +22,8 @@ export interface CoachPanelProps {
   captures: AvailableCapture[]
   blunderAlert: BlunderAlert | null
   thinking: boolean
+  /** Engine is computing or waiting for its human-feel think delay. */
+  engineThinking?: boolean
   onDismissAlert: () => void
   onTakeBackBlunder: () => void
   /** LLM/rule explanation result to show in the blunder card. Only used when mode === 'full'. */
@@ -61,6 +63,7 @@ export function CoachPanel({
   captures,
   blunderAlert,
   thinking,
+  engineThinking,
   onDismissAlert,
   onTakeBackBlunder,
   explain,
@@ -90,6 +93,15 @@ export function CoachPanel({
                   aria-hidden="true"
                 />
                 thinking…
+              </span>
+            ) : null}
+            {engineThinking ? (
+              <span className="inline-flex items-center gap-1.5 text-[0.7rem] font-medium text-emerald-700">
+                <span
+                  className="inline-block size-2 animate-pulse rounded-full bg-emerald-500"
+                  aria-hidden="true"
+                />
+                Engine thinking…
               </span>
             ) : null}
           </div>
