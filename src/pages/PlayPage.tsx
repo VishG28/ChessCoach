@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Chess } from 'chess.js'
 import type { Color, Square } from 'chess.js'
 import { useLocation } from 'react-router-dom'
 import { Board } from '@/components/board/Board'
+import { CapturedPieces } from '@/components/board/CapturedPieces'
+import { BoardActionBar } from '@/components/board/BoardActionBar'
 import { CoachPanel } from '@/components/coaching/CoachPanel'
-import { ApiKeyBanner } from '@/components/coaching/ApiKeyBanner'
 import {
   LeftSidebar,
   type CoachMode,
@@ -18,14 +19,11 @@ import { useExplain } from '@/coaching/useExplain'
 import type { BlunderContext } from '@/coaching/llmCoach'
 import { useEngine, parseUciMove } from '@/engine/engine'
 import { useChessGame } from '@/lib/useChessGame'
-import {
-  depthFromElo,
-  movetimeFromElo,
-  randomnessFromElo,
-  useMultiPV,
-} from '@/engine/eloCurves'
-import type { TopCandidate } from '@/engine/types'
+import { getWeakeningParams, humanThinkDelay, selectMove } from '@/engine/weakening'
 import { useGameLogger } from '@/games/useGameLogger'
+import { useDeepCoach, type LiveCoachMessage } from '@/coaching/useDeepCoach'
+import type { CoachingStyle, PreMoveContext } from '@/coaching/deepCoach'
+import { useShortcut } from '@/lib/shortcuts'
 
 /** Convert a UCI move to SAN given a FEN. Returns UCI string unchanged on failure. */
 function uciToSanLocal(fen: string, uci: string): string {
@@ -49,16 +47,6 @@ function resolveUserColor(choice: UserColor): 'white' | 'black' {
   return choice
 }
 
-function weightedPick<T>(items: T[], weights: number[]): T {
-  const total = weights.slice(0, items.length).reduce((a, b) => a + b, 0)
-  let r = Math.random() * total
-  for (let i = 0; i < items.length; i++) {
-    r -= weights[i] ?? 0
-    if (r <= 0) return items[i]
-  }
-  return items[items.length - 1]
-}
-
 export function PlayPage() {
   const game = useChessGame()
   const { engine, ready } = useEngine()
@@ -67,7 +55,9 @@ export function PlayPage() {
   const [elo, setElo] = useState(DEFAULT_ELO)
   const [colorChoice, setColorChoice] = useState<UserColor>(DEFAULT_USER_COLOR)
   const [coachMode, setCoachMode] = useState<CoachMode>(DEFAULT_COACH_MODE)
+  const [coachingStyle, setCoachingStyle] = useState<CoachingStyle>('conversational')
   const [debugOpen, setDebugOpen] = useState(false)
+  const [engineThinking, setEngineThinking] = useState(false)
 
   const userColor: Color = game.orientation === 'white' ? 'w' : 'b'
 
@@ -90,23 +80,8 @@ export function PlayPage() {
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Backtick key toggles debug overlay (ignored when typing in inputs)
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key !== '`') return
-      const target = e.target as HTMLElement | null
-      if (
-        target?.tagName === 'INPUT' ||
-        target?.tagName === 'TEXTAREA' ||
-        target?.isContentEditable
-      ) {
-        return
-      }
-      setDebugOpen((v) => !v)
-    }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [])
+  // Power-user keyboard shortcuts (all auto-skipped when typing in inputs)
+  useShortcut('`', () => setDebugOpen((v) => !v))
 
   // Push strength to the engine whenever it changes (and once on ready).
   useEffect(() => {
@@ -124,8 +99,8 @@ export function PlayPage() {
     evalDepth: 10,
   })
 
-  // LLM explanation wiring
-  const { apiKey } = useApiKey()
+  // LLM explanation wiring (key is held in memory only, accessed lazily)
+  const { hasKey } = useApiKey()
   const blunderAlert = coach.blunderAlert
 
   // Build the BlunderContext only when there's an active blunder alert.
@@ -184,7 +159,7 @@ export function PlayPage() {
   })
 
   // Log every move to persistent game storage with background analysis
-  useGameLogger({
+  const { appendCoachMessage } = useGameLogger({
     game,
     engineElo: elo,
     userColor: userColor === 'w' ? 'white' : 'black',
@@ -193,6 +168,90 @@ export function PlayPage() {
       ? { ply: game.history.length, text: `Blunder: ${coach.blunderAlert.san} lost ${coach.blunderAlert.loss}cp. Engine prefers ${coach.blunderAlert.better}.` }
       : null,
   })
+
+  // Refs for the current pre/post move context so Tell Me More can reference them
+  const lastPreMoveCtxRef = useRef<PreMoveContext | null>(null)
+
+  // Deep coach: streaming multi-layer coaching messages
+  const deepCoach = useDeepCoach({
+    style: coachingStyle,
+    enabled: coachMode === 'full' && hasKey,
+    onComplete: useCallback((msg: LiveCoachMessage) => {
+      // Persist the completed message against the current ply
+      appendCoachMessage(game.history.length, {
+        trigger: msg.trigger,
+        style: msg.style,
+        depth: msg.depth,
+        content: msg.content,
+        timestamp: msg.timestamp,
+      })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [appendCoachMessage, game.history.length]),
+  })
+
+  // Pre-move coaching: fire when it becomes the user's turn
+  useEffect(() => {
+    if (game.isGameOver) return
+    if (game.turn !== userColor) return
+    if (coachMode !== 'full' || !hasKey) return
+    if (!coach.liveEval) return
+
+    // Build PreMoveContext from available engine data
+    const liveEval = coach.liveEval
+    const recentMovesSan = game.history.slice(-8).map((m) => m.san)
+    const bestMoveSan = uciToSanLocal(game.fen, liveEval.bestMove)
+    const pvSan: string[] = []
+    try {
+      const pvChess = new Chess(game.fen)
+      for (const uci of (liveEval.pv ?? []).slice(0, 5)) {
+        const from = uci.slice(0, 2)
+        const to = uci.slice(2, 4)
+        const prom = uci.length >= 5 ? (uci[4] as 'q' | 'r' | 'b' | 'n') : undefined
+        const m = pvChess.move({ from, to, promotion: prom })
+        if (!m) break
+        pvSan.push(m.san)
+      }
+    } catch { /* ignore */ }
+
+    const ctx: PreMoveContext = {
+      fen: game.fen,
+      recentMovesSan,
+      color: userColor === 'w' ? 'white' : 'black',
+      bestMoveSan,
+      bestEvalCp: liveEval.cp,
+      candidatesSan: [{ san: bestMoveSan, cp: liveEval.cp }],
+      pvSan,
+      materialSummary: 'even',
+      userElo: elo,
+    }
+    lastPreMoveCtxRef.current = ctx
+
+    deepCoach.fire({
+      trigger: 'pre_move',
+      depth: 'detail',
+      fen: game.fen,
+      preMove: ctx,
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [game.fen, game.turn, game.isGameOver, coachMode, hasKey, coachingStyle])
+
+  // Tell Me More handler
+  const handleTellMore = useCallback((messageId: string) => {
+    const msg = deepCoach.messages.find((m) => m.id === messageId)
+    if (!msg) return
+    deepCoach.fire({
+      trigger: 'tell_me_more',
+      depth: msg.depth,
+      fen: msg.fen,
+      preMove: lastPreMoveCtxRef.current ?? undefined,
+      followUp: 'Go deeper on this position. What else should I notice? Any obscure tactical or strategic ideas I should know about? What would a master player consider here?',
+    })
+  }, [deepCoach])
+
+  // Quieter handler: downgrade to warnings mode
+  const handleQuieter = useCallback(() => {
+    setCoachMode('warnings')
+  }, [])
 
   // Engine plays the opposite color. Use a request-id ref to discard stale
   // bestmoves if the position changes (takeback, new game) mid-search.
@@ -204,52 +263,60 @@ export function PlayPage() {
     if (game.turn !== engineColor) return
 
     const requestId = ++engineRequestIdRef.current
-    const depth = depthFromElo(elo)
-    const movetime = movetimeFromElo(elo)
-    const multipvEnabled = useMultiPV(elo)
-    const multipv = multipvEnabled ? 5 : 1
-    const randomness = randomnessFromElo(elo)
+    const params = getWeakeningParams(elo)
+    const evalCp = coach.liveEval?.cp
+    const fenBefore = game.fen
 
+    setEngineThinking(true)
     void (async () => {
       try {
+        const startedAt = performance.now()
         const move = await engine.requestMove({
-          fen: game.fen,
-          depth,
-          movetime,
-          multipv,
+          fen: fenBefore,
+          depth: params.depth,
+          movetime: params.movetime,
+          multipv: params.multipv,
         })
         if (engineRequestIdRef.current !== requestId) return
 
-        let chosen = move
+        const fallbackUci = `${move.from}${move.to}${move.promotion ?? ''}`
+        const candidates =
+          move.topCandidates && move.topCandidates.length > 0
+            ? move.topCandidates
+            : [{ move: fallbackUci, cp: 0, pv: [] }]
 
-        // Apply weighted-random candidate selection at low Elo
-        if (
-          multipvEnabled &&
-          move.topCandidates &&
-          move.topCandidates.length > 1 &&
-          Math.random() < randomness
-        ) {
-          const cands = move.topCandidates.slice(0, 5) as TopCandidate[]
-          const weights = [5, 4, 3, 2, 1].slice(0, cands.length)
-          const pick = weightedPick(cands, weights)
-          chosen = parseUciMove(pick.move)
-        }
+        const result = selectMove({
+          candidates,
+          randomMoveChance: params.randomMoveChance,
+          blunderChance: params.blunderChance,
+          fenBefore,
+          eloForSanity: elo,
+          evalCp,
+        })
 
+        // Wait for human-feel think time, measured from request start.
+        const elapsed = performance.now() - startedAt
+        const wait = Math.max(0, humanThinkDelay() - elapsed)
+        if (wait > 0) await new Promise((r) => setTimeout(r, wait))
+        if (engineRequestIdRef.current !== requestId) return
+
+        const chosen = parseUciMove(result.uci)
         game.makeMove({
           from: chosen.from as Square,
           to: chosen.to as Square,
           promotion: chosen.promotion,
         })
 
-        // Record SAN for the debug overlay after the move is applied
         const lastEntry = game.history[game.history.length - 1]
-        const uciStr = `${chosen.from}${chosen.to}${chosen.promotion ?? ''}`
         if (lastEntry && engine) {
-          engine.recordEngineMoveSan(uciStr, lastEntry.san)
+          engine.recordEngineMoveSan(result.uci, lastEntry.san)
+          engine.recordRoll(result.uci, result.roll, result.cpBest)
         }
       } catch {
         // Engine disposed mid-request, or transport error. Silent fail —
         // the position will retry on the next render cycle.
+      } finally {
+        if (engineRequestIdRef.current === requestId) setEngineThinking(false)
       }
     })()
     // `game` is intentionally omitted: it's a new object every render and
@@ -270,24 +337,54 @@ export function PlayPage() {
     })
   }
 
-  const handleNewGame = (): void => {
+  const handleNewGame = useCallback((): void => {
     engineRequestIdRef.current++ // invalidate any in-flight engine move
     coach.dismissAlert()
+    deepCoach.cancel()
     const next = resolveUserColor(colorChoice)
     game.setOrientation(next)
     game.reset()
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [colorChoice, coach.dismissAlert, deepCoach.cancel])
 
-  const handleTakeBack = (): void => {
+  const handleTakeBack = useCallback((): void => {
     if (game.history.length === 0) return
     engineRequestIdRef.current++ // invalidate any in-flight engine move
     coach.dismissAlert()
+    deepCoach.cancel()
     // If it's currently the user's turn, the last ply was the engine's reply
     // to the user's blunder; undo both. If it's the engine's turn, only the
     // user's most recent move has been played; undo just that.
     const pliesToUndo = game.turn === userColor ? 2 : 1
     game.undo(Math.min(pliesToUndo, game.history.length))
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [game.history.length, game.turn, userColor, coach.dismissAlert, deepCoach.cancel])
+
+  // Global event listeners for command palette
+  useEffect(() => {
+    const onNewGame = () => handleNewGame()
+    const onTakeBack = () => handleTakeBack()
+    const onFlipBoard = () => game.setOrientation(game.orientation === 'white' ? 'black' : 'white')
+    window.addEventListener('cc:new-game', onNewGame)
+    window.addEventListener('cc:take-back', onTakeBack)
+    window.addEventListener('cc:flip-board', onFlipBoard)
+    return () => {
+      window.removeEventListener('cc:new-game', onNewGame)
+      window.removeEventListener('cc:take-back', onTakeBack)
+      window.removeEventListener('cc:flip-board', onFlipBoard)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [handleNewGame, handleTakeBack])
+
+  // Direct keyboard shortcuts (mirror the command palette actions)
+  useShortcut('mod+n', handleNewGame)
+  useShortcut('mod+z', handleTakeBack)
+  useShortcut('f', () =>
+    game.setOrientation(game.orientation === 'white' ? 'black' : 'white'),
+  )
+  useShortcut('mod+e', () =>
+    window.dispatchEvent(new Event('cc:open-api-key')),
+  )
 
   // Eval bar wants White-POV centipawns. EngineEval.cp is from side-to-move
   // POV at the evaluated FEN, which (for liveEval) corresponds to game.turn.
@@ -307,25 +404,31 @@ export function PlayPage() {
   const activePly = game.history.length - 1
 
   return (
-    <div className="flex flex-col px-6 py-8">
-      <ApiKeyBanner coachMode={coachMode} hasKey={apiKey !== null} />
-      <div className="flex gap-6 w-full max-w-[1180px] mx-auto">
-        <aside className="w-64 shrink-0">
-          <LeftSidebar
-            elo={elo}
-            onEloChange={setElo}
-            color={colorChoice}
-            onColorChange={setColorChoice}
-            coachMode={coachMode}
-            onCoachModeChange={setCoachMode}
-            onNewGame={handleNewGame}
-            onTakeBack={handleTakeBack}
-            canTakeBack={game.history.length > 0}
-            engineStatus={ready ? 'ready' : 'loading'}
-          />
-        </aside>
+    <div className="mx-auto grid w-full max-w-[1280px] grid-cols-1 gap-6 px-6 py-8 md:grid-cols-[280px_1fr_320px]">
+      <aside className="space-y-4 md:sticky md:top-20 md:self-start">
+        <LeftSidebar
+          elo={elo}
+          onEloChange={setElo}
+          color={colorChoice}
+          onColorChange={setColorChoice}
+          coachMode={coachMode}
+          onCoachModeChange={setCoachMode}
+          onNewGame={handleNewGame}
+          onTakeBack={handleTakeBack}
+          canTakeBack={game.history.length > 0}
+          engineStatus={ready ? 'ready' : 'loading'}
+          coachingStyle={coachingStyle}
+          onCoachingStyleChange={setCoachingStyle}
+        />
+      </aside>
 
-        <main className="flex-1 flex flex-col items-center gap-4">
+      <main className="flex flex-col items-center gap-4">
+        <CapturedPieces
+          history={game.history}
+          side="opponent"
+          userColor={userColor === 'w' ? 'white' : 'black'}
+        />
+        <div className="rounded-lg bg-card p-3 shadow-lg">
           <Board
             fen={game.fen}
             orientation={game.orientation}
@@ -336,27 +439,39 @@ export function PlayPage() {
             inCheck={game.inCheck}
             onUserMove={handleUserMove}
           />
-          <CoachPanel
-            mode={coachMode}
-            threats={coach.threats}
-            captures={coach.captures}
-            blunderAlert={coach.blunderAlert}
-            thinking={coach.thinking}
-            onDismissAlert={coach.dismissAlert}
-            onTakeBackBlunder={handleTakeBack}
-            explain={explain}
-          />
-        </main>
+        </div>
+        <BoardActionBar
+          onFlip={() => game.setOrientation(game.orientation === 'white' ? 'black' : 'white')}
+        />
+        <CapturedPieces
+          history={game.history}
+          side="user"
+          userColor={userColor === 'w' ? 'white' : 'black'}
+        />
+        <CoachPanel
+          mode={coachMode}
+          threats={coach.threats}
+          captures={coach.captures}
+          blunderAlert={coach.blunderAlert}
+          thinking={coach.thinking}
+          engineThinking={engineThinking}
+          onDismissAlert={coach.dismissAlert}
+          onTakeBackBlunder={handleTakeBack}
+          explain={explain}
+          messages={deepCoach.messages}
+          onTellMore={handleTellMore}
+          onQuieter={handleQuieter}
+        />
+      </main>
 
-        <aside className="w-72 shrink-0">
-          <RightSidebar
-            history={game.history}
-            evalCpWhitePov={evalCpWhitePov}
-            mateIn={mateInWhitePov}
-            activePly={activePly >= 0 ? activePly : null}
-          />
-        </aside>
-      </div>
+      <aside className="space-y-4 md:sticky md:top-20 md:self-start">
+        <RightSidebar
+          history={game.history}
+          evalCpWhitePov={evalCpWhitePov}
+          mateIn={mateInWhitePov}
+          activePly={activePly >= 0 ? activePly : null}
+        />
+      </aside>
 
       {debugOpen && engine && <DebugOverlay engine={engine} elo={elo} />}
     </div>

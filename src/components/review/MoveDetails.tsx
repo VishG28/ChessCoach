@@ -1,9 +1,11 @@
 import { useState, useMemo, useEffect } from 'react'
 import { Chess } from 'chess.js'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import type { Game, MoveEntry } from '@/games/types'
 import { CLASS_BG, CLASS_LABEL } from '@/games/classification'
 import { Button } from '@/components/ui/button'
+import { Progress } from '@/components/ui/progress'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { useApiKey } from '@/coaching/apiKey'
 import { useExplain } from '@/coaching/useExplain'
 import type { BlunderContext } from '@/coaching/llmCoach'
@@ -31,7 +33,7 @@ function uciToSan(fen: string, uci: string): string {
 
 export function MoveDetails({ game, move, selectedPly }: MoveDetailsProps) {
   const navigate = useNavigate()
-  const { apiKey } = useApiKey()
+  const { hasKey } = useApiKey()
   const [triggered, setTriggered] = useState(false)
 
   // Reset explanation state when the selected move changes
@@ -149,19 +151,25 @@ export function MoveDetails({ game, move, selectedPly }: MoveDetailsProps) {
         </div>
       )}
 
-      {/* Top alternatives */}
+      {/* Top alternatives with mini progress bars */}
       {move.top_alternatives && move.top_alternatives.length > 0 && (
         <div>
-          <div className="text-xs text-zinc-400 mb-1 uppercase tracking-wide">Top lines</div>
-          <div className="space-y-1">
+          <div className="text-xs text-muted-foreground mb-2 uppercase tracking-wide">Top lines</div>
+          <div className="space-y-2">
             {move.top_alternatives.slice(0, 3).map((alt, i) => {
               const altSan = uciToSan(move.fen_before, alt.move)
               const cpStr = alt.cp >= 0 ? `+${alt.cp}` : `${alt.cp}`
+              // Map cp to 0–100 progress: 0 cp = 50%, +500 = 100%, -500 = 0%
+              const progressPct = Math.max(0, Math.min(100, 50 + alt.cp / 10))
+              const barClass = alt.cp >= 0 ? '[&>div]:bg-emerald-500' : '[&>div]:bg-red-500'
               return (
-                <div key={i} className="flex gap-2 text-xs font-mono">
-                  <span className="text-zinc-400">{i + 1}.</span>
-                  <span className="font-medium text-zinc-800">{altSan}</span>
-                  <span className="text-zinc-500">({cpStr})</span>
+                <div key={i} className="space-y-0.5">
+                  <div className="flex items-center gap-2 text-xs font-mono">
+                    <span className="text-muted-foreground w-3">{i + 1}.</span>
+                    <span className="font-medium">{altSan}</span>
+                    <span className="text-muted-foreground ml-auto">{cpStr}</span>
+                  </div>
+                  <Progress value={progressPct} className={`h-1 ${barClass}`} />
                 </div>
               )
             })}
@@ -186,25 +194,29 @@ export function MoveDetails({ game, move, selectedPly }: MoveDetailsProps) {
         >
           Play from here
         </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setTriggered(true)}
-          disabled={triggered && explain.loading}
-          title="Get an AI explanation of this move"
-        >
-          Explain this move
-        </Button>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setTriggered(true)}
+                  disabled={triggered && explain.loading}
+                  title="Get an AI explanation of this move"
+                >
+                  Explain this move
+                </Button>
+              </span>
+            </TooltipTrigger>
+            {!hasKey && (
+              <TooltipContent>
+                Add your Anthropic API key to enable explanations
+              </TooltipContent>
+            )}
+          </Tooltip>
+        </TooltipProvider>
       </div>
-      {!apiKey && !triggered && (
-        <p className="text-xs text-zinc-500 mt-1">
-          No API key set —{' '}
-          <Link to="/settings" className="underline">
-            add one in Settings
-          </Link>{' '}
-          for AI explanations, or click to see rule-based feedback.
-        </p>
-      )}
       {triggered && (
         <div className="mt-2">
           <ExplainBox

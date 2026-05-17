@@ -1,13 +1,16 @@
 import { Board } from '@/components/board/Board'
 import { OpeningTree } from '@/components/openings/OpeningTree'
 import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
+import { Progress } from '@/components/ui/progress'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { CheckCircle2 } from 'lucide-react'
 import { OPENINGS } from '@/openings/index'
 import { useOpeningTrainer } from '@/openings/useOpeningTrainer'
-import { cn } from '@/lib/utils'
+import { masteredCount } from '@/openings/progress'
 
 export function OpeningsPage() {
   const trainer = useOpeningTrainer()
@@ -22,7 +25,6 @@ export function OpeningsPage() {
     drillMode,
     hintActive,
     correctToSquares,
-    progressFraction,
     dests,
     userColor,
     orientation,
@@ -51,55 +53,53 @@ export function OpeningsPage() {
 
   return (
     <main className="max-w-[1200px] mx-auto px-6 py-8">
-      {/* Header + progress */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-semibold">{opening.title}</h1>
-          <p className="text-sm text-zinc-500 mt-0.5">{opening.description}</p>
-        </div>
-        <div className="text-right">
-          <div className="text-sm font-medium text-zinc-700">
-            {progressFraction.mastered} / {progressFraction.total} lines mastered
-          </div>
-          <div className="mt-1 h-2 w-40 bg-zinc-200 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-green-500 rounded-full transition-all duration-500"
-              style={{
-                width:
-                  progressFraction.total > 0
-                    ? `${(progressFraction.mastered / progressFraction.total) * 100}%`
-                    : '0%',
-              }}
-            />
-          </div>
-        </div>
-      </div>
+      <h1 className="text-2xl font-semibold mb-2">Openings</h1>
 
-      {/* Tab selector */}
-      <div className="flex gap-2 mb-6">
+      {/* Shadcn Tabs for opening selector */}
+      <Tabs value={opening.id} onValueChange={selectOpening} className="mb-6">
+        <TabsList>
+          {OPENINGS.map(o => {
+            const prog = masteredCount(o)
+            return (
+              <TabsTrigger key={o.id} value={o.id} className="gap-2">
+                {o.title}
+                <span className="text-xs opacity-60">
+                  ({o.userColor === 'white' ? 'White' : 'Black'})
+                </span>
+                {prog.mastered === prog.total && prog.total > 0 && (
+                  <CheckCircle2 className="size-3 text-emerald-500" />
+                )}
+              </TabsTrigger>
+            )
+          })}
+        </TabsList>
+
         {OPENINGS.map(o => (
-          <button
-            key={o.id}
-            onClick={() => selectOpening(o.id)}
-            className={cn(
-              'px-4 py-2 rounded-lg text-sm font-medium transition-colors border',
-              o.id === opening.id
-                ? 'bg-zinc-900 text-white border-zinc-900'
-                : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-50',
-            )}
-          >
-            {o.title}
-            <span className="ml-2 text-xs opacity-60">
-              ({o.userColor === 'white' ? 'White' : 'Black'})
-            </span>
-          </button>
+          <TabsContent key={o.id} value={o.id}>
+            {/* Opening title + progress bar */}
+            <div className="mb-6 space-y-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium">{o.title}</p>
+                  <p className="text-sm text-muted-foreground">{o.description}</p>
+                </div>
+                <span className="text-sm text-muted-foreground">
+                  {masteredCount(o).mastered} / {masteredCount(o).total} mastered
+                </span>
+              </div>
+              <Progress
+                value={masteredCount(o).total > 0 ? (masteredCount(o).mastered / masteredCount(o).total) * 100 : 0}
+                className="h-2 [&>div]:bg-emerald-500"
+              />
+            </div>
+          </TabsContent>
         ))}
-      </div>
+      </Tabs>
 
-      {/* Main layout: board + controls + tree */}
-      <div className="flex gap-6 items-start">
-        {/* Left: Board */}
-        <div className="flex-shrink-0">
+      {/* Main layout: board left, tree right */}
+      <div className="grid grid-cols-1 md:grid-cols-[480px_1fr] gap-6 items-start">
+        {/* Left: Board + drill controls */}
+        <div className="flex flex-col gap-4">
           <Board
             fen={fen}
             orientation={orientation}
@@ -111,93 +111,107 @@ export function OpeningsPage() {
             onUserMove={handleMove}
           />
 
-          {/* Controls below board */}
-          <div className="mt-4 flex items-center gap-3 flex-wrap">
-            <Button variant="outline" size="sm" onClick={tryAgain}>
-              Try Again
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={showHint}
-              disabled={!userToMove || currentNode.children.length === 0}
-            >
-              Show Hint
-            </Button>
-            <div className="flex items-center gap-2 ml-auto">
-              <Switch
-                id="drill-mode"
-                checked={drillMode}
-                onCheckedChange={setDrillMode}
-              />
-              <Label htmlFor="drill-mode" className="text-sm cursor-pointer">
-                Drill Mode
-              </Label>
-            </div>
-          </div>
+          {/* Drill controls card */}
+          <Card>
+            <CardContent className="p-3 space-y-3">
+              {/* Controls row */}
+              <div className="flex items-center gap-3 flex-wrap">
+                <Button variant="outline" size="sm" onClick={tryAgain}>
+                  Try Again
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={showHint}
+                  disabled={!userToMove || currentNode.children.length === 0}
+                >
+                  Show Hint
+                </Button>
+                <div className="flex items-center gap-2 ml-auto">
+                  <Switch
+                    id="drill-mode"
+                    checked={drillMode}
+                    onCheckedChange={setDrillMode}
+                  />
+                  <Label htmlFor="drill-mode" className="text-sm cursor-pointer">
+                    Drill Mode
+                  </Label>
+                </div>
+              </div>
+
+              {/* Turn indicator */}
+              <div className="text-xs">
+                {userToMove ? (
+                  <span className="text-emerald-600 font-medium">Your turn to move</span>
+                ) : (
+                  <span className="text-muted-foreground">Engine is moving...</span>
+                )}
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Hint */}
           {hintActive && correctToSquares.length > 0 && (
-            <Card className="mt-3 px-4 py-3 border-blue-200 bg-blue-50">
-              <div className="text-sm text-blue-800">
+            <Card className="border-blue-200 bg-blue-50">
+              <CardContent className="p-3 text-sm text-blue-800">
                 <span className="font-semibold">Hint:</span> Move to{' '}
                 {correctToSquares.join(' or ')}.
-              </div>
+              </CardContent>
             </Card>
           )}
 
           {/* Wrong move feedback */}
           {wrongMove && (
-            <Card className="mt-3 px-4 py-3 border-red-200 bg-red-50">
-              <div className="text-sm text-red-800 space-y-1">
+            <Card className="border-red-200 bg-red-50">
+              <CardContent className="p-3 text-sm text-red-800 space-y-2">
                 <div>
                   <span className="font-semibold">Wrong move:</span>{' '}
                   {wrongMove.from}→{wrongMove.to}
                 </div>
                 {wrongCorrectSans.length > 0 && (
                   <div>
-                    <span className="font-semibold">Correct move{wrongCorrectSans.length > 1 ? 's' : ''}:</span>{' '}
+                    <span className="font-semibold">
+                      Correct move{wrongCorrectSans.length > 1 ? 's' : ''}:
+                    </span>{' '}
                     {wrongCorrectSans.join(' or ')}
                   </div>
                 )}
                 <Button
                   size="sm"
                   variant="outline"
-                  className="mt-2 border-red-300 text-red-700 hover:bg-red-100"
+                  className="border-red-300 text-red-700 hover:bg-red-100"
                   onClick={tryAgain}
                 >
                   Try Again
                 </Button>
-              </div>
+              </CardContent>
             </Card>
           )}
 
           {/* Explanation card */}
           {!wrongMove && lastExplanation && (
-            <Card className="mt-3 px-4 py-3 border-zinc-200 bg-zinc-50">
-              <div className="text-sm text-zinc-700">{lastExplanation}</div>
+            <Card>
+              <CardContent className="p-3 text-sm text-muted-foreground">
+                {lastExplanation}
+              </CardContent>
             </Card>
           )}
-
-          {/* Turn indicator */}
-          <div className="mt-3 text-xs text-zinc-500">
-            {userToMove ? (
-              <span className="text-green-600 font-medium">Your turn to move</span>
-            ) : (
-              <span>Engine is moving...</span>
-            )}
-          </div>
         </div>
 
-        {/* Right: Opening tree */}
-        <Card className="flex-1 min-w-[220px] max-w-xs p-3">
-          <ScrollArea className="h-[580px]">
-            <OpeningTree
-              opening={opening}
-              currentNodeId={currentNode.id}
-              onGoToLine={goToLine}
-            />
-          </ScrollArea>
+        {/* Right: Opening variation tree */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">Variation tree</CardTitle>
+          </CardHeader>
+          <CardContent className="p-3 pt-0">
+            <ScrollArea className="h-[580px]">
+              <OpeningTree
+                opening={opening}
+                currentNodeId={currentNode.id}
+                onGoToLine={goToLine}
+              />
+            </ScrollArea>
+          </CardContent>
         </Card>
       </div>
     </main>

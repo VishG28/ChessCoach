@@ -1,16 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import type { EngineDebugState, EngineEval, EngineMove, TopCandidate } from './types'
-import {
-  UCI_ELO_FLOOR,
-  depthFromElo,
-  movetimeFromElo,
-  randomnessFromElo,
-  skillFromElo,
-  useMultiPV,
-} from './eloCurves'
+import { getWeakeningParams } from './weakening'
 
 const WORKER_URL = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/engine/stockfish-18-lite-single.js`
-const ELO_MAX_UCI = 3190
 const MATE_SCORE = 100000
 const RECENT_MOVES_MAX = 5
 const LAST_COMMANDS_MAX = 20
@@ -23,10 +15,6 @@ export interface EngineOptions {
 export interface AnalysisResult {
   eval: EngineEval
   candidates: TopCandidate[]
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value))
 }
 
 export function parseUciMove(uci: string): EngineMove {
@@ -123,6 +111,17 @@ export class Engine {
     this.updateDebug({ recentMoves: moves })
   }
 
+  recordRoll(
+    uci: string,
+    roll: 'best' | 'random' | 'blunder' | 'filtered',
+    cpBest: number,
+  ): void {
+    const moves = this.debugState.recentMoves.map((m) =>
+      m.uci === uci && m.roll === undefined ? { ...m, roll, cpBest } : m,
+    )
+    this.updateDebug({ recentMoves: moves })
+  }
+
   private updateDebug(patch: Partial<EngineDebugState>): void {
     this.debugState = { ...this.debugState, ...patch }
     const snapshot = this.getDebugState()
@@ -140,38 +139,34 @@ export class Engine {
   }
 
   setStrength(elo: number): Promise<void> {
-    const skill = skillFromElo(elo)
-    const depth = depthFromElo(elo)
-    const movetime = movetimeFromElo(elo)
-    const randomness = randomnessFromElo(elo)
-    const multipv = useMultiPV(elo) ? 5 : 1
-    const limit = elo >= UCI_ELO_FLOOR
+    const p = getWeakeningParams(elo)
+    const skill = p.useUciLimit ? 20 : 0
 
     const cmds: string[] = [
-      `setoption name MultiPV value ${multipv}`,
+      `setoption name MultiPV value ${p.multipv}`,
       `setoption name Skill Level value ${skill}`,
-      `setoption name UCI_LimitStrength value ${limit}`,
+      `setoption name UCI_LimitStrength value ${p.useUciLimit}`,
     ]
-    if (limit) {
-      cmds.push(`setoption name UCI_Elo value ${clamp(Math.round(elo), UCI_ELO_FLOOR, ELO_MAX_UCI)}`)
+    if (p.useUciLimit) {
+      cmds.push(`setoption name UCI_Elo value ${p.uciElo}`)
     }
     cmds.push('isready')
 
-    this.currentMultipv = multipv
+    this.currentMultipv = p.multipv
 
     const updatedCommands = [...this.debugState.lastCommands, ...cmds].slice(-LAST_COMMANDS_MAX)
     this.updateDebug({
       elo,
       skill,
-      depth,
-      movetime,
-      multipv,
-      randomness,
+      depth: p.depth,
+      movetime: p.movetime,
+      multipv: p.multipv,
+      randomness: p.randomMoveChance,
       lastCommands: updatedCommands,
     })
 
     if (import.meta.env.DEV) {
-      console.info('[engine] setStrength', { elo, skill, depth, movetime, multipv, limit })
+      console.info('[engine] setStrength', { elo, skill, depth: p.depth, movetime: p.movetime, multipv: p.multipv, useUciLimit: p.useUciLimit })
     }
 
     return this.enqueue('ready', cmds) as Promise<void>

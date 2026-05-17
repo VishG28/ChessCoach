@@ -1,8 +1,21 @@
 import { v4 as uuid } from 'uuid'
-import type { Game, GameResult, MoveEntry } from './types'
+import type { CoachMessageRecord, Game, GameResult, MoveEntry } from './types'
 
 const GAMES_KEY = 'cc.games.v1'
 const MAX_GAMES = 200
+
+/** Migrate a move's legacy single coach_message string to coach_messages array. */
+function migrateMoveEntry(m: MoveEntry): MoveEntry {
+  if (m.coach_messages !== undefined || !m.coach_message) return m
+  const record: CoachMessageRecord = {
+    trigger: 'post_move',
+    style: 'conversational',
+    depth: 'detail',
+    content: m.coach_message,
+    timestamp: m.timestamp ?? Date.now(),
+  }
+  return { ...m, coach_messages: [record] }
+}
 
 function readAll(): Game[] {
   try {
@@ -10,7 +23,11 @@ function readAll(): Game[] {
     if (!raw) return []
     const parsed = JSON.parse(raw) as unknown
     if (!Array.isArray(parsed)) return []
-    return parsed as Game[]
+    // Apply backward-compat migration for each game's moves
+    return (parsed as Game[]).map((g) => ({
+      ...g,
+      moves: g.moves.map(migrateMoveEntry),
+    }))
   } catch {
     return []
   }

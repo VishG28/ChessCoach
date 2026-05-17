@@ -1,11 +1,48 @@
-import { Outlet } from 'react-router-dom'
+import { NavLink, Outlet } from 'react-router-dom'
+import { Sword, BookOpen, ChartBar } from 'lucide-react'
+import { Toaster } from 'sonner'
 import { TopNav } from './TopNav'
+import { CommandPalette } from '@/components/command/CommandPalette'
+import { ShortcutCheatsheet } from '@/components/command/ShortcutCheatsheet'
+import { cn } from '@/lib/utils'
+
+const MOBILE_LINKS = [
+  { to: '/', label: 'Play', Icon: Sword },
+  { to: '/games', label: 'Review', Icon: ChartBar },
+  { to: '/openings', label: 'Openings', Icon: BookOpen },
+]
 
 export function RootLayout() {
   return (
-    <div className="min-h-screen bg-[#f7f6f1]">
+    <div className="min-h-screen bg-background pb-16 md:pb-0">
       <TopNav />
       <Outlet />
+      <CommandPalette />
+      <ShortcutCheatsheet />
+      <Toaster richColors closeButton position="bottom-right" />
+
+      {/* Mobile bottom nav — hidden on md+ */}
+      <nav
+        className="fixed bottom-0 inset-x-0 z-40 flex md:hidden h-16 border-t bg-background/90 backdrop-blur"
+        aria-label="Mobile navigation"
+      >
+        {MOBILE_LINKS.map(({ to, label, Icon }) => (
+          <NavLink
+            key={to}
+            to={to}
+            end={to === '/'}
+            className={({ isActive }) =>
+              cn(
+                'flex flex-1 flex-col items-center justify-center gap-0.5 text-[0.65rem] font-medium transition-colors',
+                isActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground',
+              )
+            }
+          >
+            <Icon className="size-5" aria-hidden="true" />
+            {label}
+          </NavLink>
+        ))}
+      </nav>
     </div>
   )
 }

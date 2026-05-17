@@ -1,9 +1,11 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Trophy, Frown, Minus, Trash2 } from 'lucide-react'
+import { useNavigate, Link } from 'react-router-dom'
+import { Trophy, Frown, Minus, Trash2, Crown } from 'lucide-react'
 import { listGames, deleteGame } from '@/games/gameStore'
 import type { Game, GameResult } from '@/games/types'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Card, CardContent } from '@/components/ui/card'
 
 function resultIcon(result: GameResult, userColor: 'white' | 'black') {
   if (result === 'ongoing') return <Minus className="w-4 h-4 text-zinc-400" />
@@ -50,8 +52,15 @@ export function GamesListPage() {
   if (games.length === 0) {
     return (
       <main className="max-w-[1180px] mx-auto px-6 py-8">
-        <h1 className="text-2xl font-semibold mb-4">Games</h1>
-        <p className="text-zinc-500">No games yet — play one to see it here.</p>
+        <h1 className="text-2xl font-semibold mb-6">Games</h1>
+        <Card className="flex flex-col items-center justify-center py-16 text-center">
+          <Crown className="size-12 text-muted-foreground mb-4" />
+          <p className="text-lg font-medium mb-1">No games yet</p>
+          <p className="text-sm text-muted-foreground mb-6">Play your first game to see it here.</p>
+          <Button asChild>
+            <Link to="/">Play your first game</Link>
+          </Button>
+        </Card>
       </main>
     )
   }
@@ -59,58 +68,63 @@ export function GamesListPage() {
   return (
     <main className="max-w-[1180px] mx-auto px-6 py-8">
       <h1 className="text-2xl font-semibold mb-6">Games</h1>
-      <div className="overflow-x-auto rounded-lg border border-zinc-200 bg-white">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-zinc-200 bg-zinc-50 text-left text-xs text-zinc-500 uppercase tracking-wide">
-              <th className="px-4 py-3">Date</th>
-              <th className="px-4 py-3">Result</th>
-              <th className="px-4 py-3">Opponent</th>
-              <th className="px-4 py-3">Color</th>
-              <th className="px-4 py-3">Accuracy</th>
-              <th className="px-4 py-3">Blunders</th>
-              <th className="px-4 py-3">Moves</th>
-              <th className="px-4 py-3" />
-            </tr>
-          </thead>
-          <tbody>
-            {games.map((game) => (
-              <tr
-                key={game.id}
-                className="border-b border-zinc-100 hover:bg-zinc-50 cursor-pointer transition-colors"
-                onClick={() => navigate(`/games/${game.id}`)}
-              >
-                <td className="px-4 py-3 text-zinc-700 whitespace-nowrap">
-                  {new Date(game.startedAt).toLocaleString()}
-                </td>
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-1.5">
-                    {resultIcon(game.result, game.userColor)}
-                    <span className="text-zinc-700">
-                      {resultLabel(game.result, game.userColor)}
-                    </span>
-                  </div>
-                </td>
-                <td className="px-4 py-3 text-zinc-600">Stockfish {game.engineElo}</td>
-                <td className="px-4 py-3 capitalize text-zinc-600">{game.userColor}</td>
-                <td className="px-4 py-3 font-mono text-zinc-700">{accuracy(game)}</td>
-                <td className="px-4 py-3 font-mono text-zinc-700">{blunderCount(game)}</td>
-                <td className="px-4 py-3 font-mono text-zinc-600">{game.moves.length}</td>
-                <td className="px-4 py-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {games.map((game) => {
+          const label = resultLabel(game.result, game.userColor)
+          const isWin = label === 'Win'
+          const isDraw = label === 'Draw'
+          const badgeClass = isWin
+            ? 'bg-emerald-500 text-white hover:bg-emerald-500'
+            : isDraw
+              ? 'bg-zinc-500 text-white hover:bg-zinc-500'
+              : 'bg-red-500 text-white hover:bg-red-500'
+          return (
+            <Card
+              key={game.id}
+              className="cursor-pointer transition-shadow hover:shadow-md"
+              onClick={() => navigate(`/games/${game.id}`)}
+            >
+              <CardContent className="p-4 space-y-3">
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-xs text-muted-foreground">
+                    {new Date(game.startedAt).toLocaleString()}
+                  </p>
                   <Button
                     variant="ghost"
                     size="icon"
+                    className="size-6 text-muted-foreground hover:text-destructive shrink-0"
                     onClick={(e) => handleDelete(e, game.id)}
                     title="Delete game"
-                    className="text-zinc-400 hover:text-red-500"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Trash2 className="size-3" />
                   </Button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Badge className={badgeClass}>{label}</Badge>
+                  <span className="text-xs text-muted-foreground capitalize">{game.userColor}</span>
+                  <span className="text-xs text-muted-foreground">vs Stockfish {game.engineElo}</span>
+                </div>
+                <div className="flex items-center gap-4 text-sm">
+                  <div className="flex items-center gap-1">
+                    {resultIcon(game.result, game.userColor)}
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground text-xs">Accuracy </span>
+                    <span className="font-mono font-medium">{accuracy(game)}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground text-xs">Blunders </span>
+                    <span className="font-mono font-medium">{blunderCount(game)}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground text-xs">Moves </span>
+                    <span className="font-mono font-medium">{game.moves.length}</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )
+        })}
       </div>
     </main>
   )

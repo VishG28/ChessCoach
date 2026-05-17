@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Chess, type Color } from 'chess.js'
+import { toast } from 'sonner'
 import type { Engine } from '@/engine/engine'
 import type { EngineEval } from '@/engine/types'
 import type { UseChessGameResult } from '@/lib/useChessGame'
@@ -67,6 +68,8 @@ export function useCoach(opts: UseCoachOptions): UseCoachResult {
 
   // In-memory FEN -> EngineEval cache; survives re-renders via ref.
   const evalCacheRef = useRef<Map<string, EngineEval>>(new Map())
+  // Track last toasted blunder san+loss so we don't fire twice for the same alert.
+  const lastToastedAlertRef = useRef<string | null>(null)
 
   // Pre-move scan: threats + captures whenever position or coach config changes.
   useEffect(() => {
@@ -140,13 +143,23 @@ export function useCoach(opts: UseCoachOptions): UseCoachResult {
       if (prev && next) {
         const loss = cpLoss(prev, next)
         if (isBlunder(loss)) {
-          setBlunderAlert({
+          const alert: BlunderAlert = {
             san: lastMove.san,
             loss,
             better: prev.bestMove,
             pv: prev.pv.slice(0, 4),
             fenBefore: beforeFen,
-          })
+          }
+          setBlunderAlert(alert)
+          // Fire toast only once per unique blunder (keyed by san+loss)
+          const alertKey = `${alert.san}-${alert.loss}`
+          if (lastToastedAlertRef.current !== alertKey) {
+            lastToastedAlertRef.current = alertKey
+            const lossPawns = (alert.loss / 100).toFixed(1)
+            toast.error('Blunder detected', {
+              description: `${alert.san} lost ${lossPawns} pawns. Engine prefers ${alert.better}.`,
+            })
+          }
         } else {
           setBlunderAlert(null)
         }

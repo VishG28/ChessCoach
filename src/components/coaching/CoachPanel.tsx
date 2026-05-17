@@ -5,6 +5,7 @@ import type {
 } from '@/coaching/threats'
 import type { BlunderAlert } from '@/coaching/useCoach'
 import type { UseExplainResult } from '@/coaching/useExplain'
+import type { LiveCoachMessage } from '@/coaching/useDeepCoach'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -15,6 +16,7 @@ import {
 import { Separator } from '@/components/ui/separator'
 import { cn } from '@/lib/utils'
 import { ExplainBox } from './ExplainBox'
+import { CoachMessage } from './CoachMessage'
 
 export interface CoachPanelProps {
   mode: 'off' | 'warnings' | 'full'
@@ -22,10 +24,16 @@ export interface CoachPanelProps {
   captures: AvailableCapture[]
   blunderAlert: BlunderAlert | null
   thinking: boolean
+  /** Engine is computing or waiting for its human-feel think delay. */
+  engineThinking?: boolean
   onDismissAlert: () => void
   onTakeBackBlunder: () => void
   /** LLM/rule explanation result to show in the blunder card. Only used when mode === 'full'. */
   explain?: UseExplainResult
+  /** Deep coach messages to render above legacy sections. */
+  messages?: LiveCoachMessage[]
+  onTellMore?: (id: string) => void
+  onQuieter?: () => void
 }
 
 const PIECE_GLYPH: Record<PieceSymbol, string> = {
@@ -61,11 +69,16 @@ export function CoachPanel({
   captures,
   blunderAlert,
   thinking,
+  engineThinking,
   onDismissAlert,
   onTakeBackBlunder,
   explain,
+  messages,
+  onTellMore,
+  onQuieter,
 }: CoachPanelProps) {
   const isOff = mode === 'off'
+  const hasMessages = messages && messages.length > 0
 
   return (
     <Card className="w-[560px]">
@@ -92,11 +105,35 @@ export function CoachPanel({
                 thinking…
               </span>
             ) : null}
+            {engineThinking ? (
+              <span className="inline-flex items-center gap-1.5 text-[0.7rem] font-medium text-emerald-700">
+                <span
+                  className="inline-block size-2 animate-pulse rounded-full bg-emerald-500"
+                  aria-hidden="true"
+                />
+                Engine thinking…
+              </span>
+            ) : null}
           </div>
         </div>
       </CardHeader>
 
       <CardContent className="space-y-4">
+        {/* Deep coach messages rendered above legacy sections */}
+        {hasMessages && (
+          <div className="space-y-3">
+            {messages!.map((msg) => (
+              <CoachMessage
+                key={msg.id}
+                message={msg}
+                onTellMore={() => onTellMore?.(msg.id)}
+                onQuieter={() => onQuieter?.()}
+              />
+            ))}
+            <Separator />
+          </div>
+        )}
+
         {isOff ? (
           <p className="text-sm text-neutral-500">
             Coaching is off.{' '}
@@ -165,7 +202,7 @@ function BeforeMoveSection({
 
 function ThreatsList({ threats }: { threats: ThreatenedPiece[] }) {
   return (
-    <div className="rounded-md border border-red-200 bg-red-50/40 p-3">
+    <div className="rounded-md border border-red-200 bg-red-50/40 p-3 border-l-4 border-l-amber-400">
       <div className="mb-2 text-[0.65rem] font-semibold uppercase tracking-wider text-red-700">
         Threats
       </div>
@@ -206,7 +243,7 @@ function ThreatsList({ threats }: { threats: ThreatenedPiece[] }) {
 
 function CapturesList({ captures }: { captures: AvailableCapture[] }) {
   return (
-    <div className="rounded-md border border-emerald-200 bg-emerald-50/40 p-3">
+    <div className="rounded-md border border-emerald-200 bg-emerald-50/40 p-3 border-l-4 border-l-emerald-500">
       <div className="mb-2 text-[0.65rem] font-semibold uppercase tracking-wider text-emerald-700">
         Captures
       </div>
@@ -269,7 +306,7 @@ function AfterMoveSection({
   return (
     <section className="space-y-2">
       <span className={SECTION_LABEL}>After your move</span>
-      <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 shadow-sm">
+      <div className="rounded-lg border border-red-300 bg-amber-50 p-4 shadow-sm border-l-4 border-l-red-500">
         <div className="space-y-1">
           <div className="flex items-baseline gap-2">
             <span className="rounded bg-amber-200/70 px-1.5 py-0.5 font-mono text-sm font-semibold text-amber-900">
@@ -286,13 +323,21 @@ function AfterMoveSection({
         </div>
         {mode === 'full' && explain && (
           <div className="mt-3">
-            <ExplainBox
-              text={explain.text}
-              source={explain.source}
-              loading={explain.loading}
-              error={explain.error}
-              onRegenerate={explain.regenerate}
-            />
+            {explain.loading ? (
+              <div className="animate-pulse space-y-2" aria-label="Loading explanation">
+                <div className="h-3 w-3/4 rounded bg-amber-200/70" />
+                <div className="h-3 w-full rounded bg-amber-200/70" />
+                <div className="h-3 w-2/3 rounded bg-amber-200/70" />
+              </div>
+            ) : (
+              <ExplainBox
+                text={explain.text}
+                source={explain.source}
+                loading={explain.loading}
+                error={explain.error}
+                onRegenerate={explain.regenerate}
+              />
+            )}
           </div>
         )}
         <div className="mt-3 flex gap-2">

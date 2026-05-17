@@ -10,6 +10,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Separator } from '@/components/ui/separator'
 import { Slider } from '@/components/ui/slider'
 import { cn } from '@/lib/utils'
+import type { CoachingStyle } from '@/coaching/deepCoach'
 
 export type UserColor = 'white' | 'black' | 'random'
 export type CoachMode = 'off' | 'warnings' | 'full'
@@ -25,6 +26,8 @@ export interface LeftSidebarProps {
   onTakeBack: () => void
   canTakeBack: boolean
   engineStatus: 'loading' | 'ready'
+  coachingStyle?: CoachingStyle
+  onCoachingStyleChange?: (s: CoachingStyle) => void
 }
 
 const COACH_MODES: ReadonlyArray<{ value: CoachMode; label: string }> = [
@@ -53,8 +56,11 @@ export function LeftSidebar({
   onTakeBack,
   canTakeBack,
   engineStatus,
+  coachingStyle,
+  onCoachingStyleChange,
 }: LeftSidebarProps) {
   const ready = engineStatus === 'ready'
+  const styleDisabled = coachMode !== 'full'
 
   return (
     <Card className="w-full">
@@ -140,6 +146,32 @@ export function LeftSidebar({
             ))}
           </div>
         </section>
+
+        {onCoachingStyleChange && (
+          <section className={cn('space-y-3', styleDisabled && 'pointer-events-none opacity-40')}>
+            <span className={SECTION_LABEL}>Coaching style</span>
+            <RadioGroup
+              value={coachingStyle ?? 'conversational'}
+              onValueChange={(v) => onCoachingStyleChange(v as CoachingStyle)}
+              className="space-y-2"
+            >
+              {[
+                { v: 'conversational', t: 'Conversational', d: 'Strong player thinking out loud, 4-8 sentences.' },
+                { v: 'socratic',       t: 'Socratic',       d: 'Coach asks you questions instead of answering.' },
+                { v: 'tactical',       t: 'Tactical drills', d: 'Pure calculation prompts. One nudge, no spoilers.' },
+              ].map((opt) => (
+                <Label key={opt.v} htmlFor={`cs-${opt.v}`} className={cn(
+                  'flex cursor-pointer flex-col gap-1 rounded-md border p-2 text-sm transition-colors',
+                  (coachingStyle ?? 'conversational') === opt.v ? 'border-primary bg-accent' : 'hover:bg-accent/50',
+                )}>
+                  <RadioGroupItem id={`cs-${opt.v}`} value={opt.v} className="sr-only" />
+                  <span className="font-medium">{opt.t}</span>
+                  <span className="text-xs text-muted-foreground">{opt.d}</span>
+                </Label>
+              ))}
+            </RadioGroup>
+          </section>
+        )}
 
         <Separator />
 

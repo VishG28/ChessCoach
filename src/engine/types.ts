@@ -24,7 +24,15 @@ export interface EngineDebugState {
   /** Most recent UCI commands sent, oldest first (ring buffer, max 20). */
   lastCommands: string[]
   /** Last 5 engine moves played, oldest first. */
-  recentMoves: Array<{ san?: string; uci: string; cp: number }>
+  recentMoves: Array<{
+    san?: string
+    uci: string
+    cp: number
+    /** Which branch of selectMove fired for this engine move. */
+    roll?: 'best' | 'random' | 'blunder' | 'filtered'
+    /** Engine's best-eval (multipv index 1) at the time the move was chosen. */
+    cpBest?: number
+  }>
 }
 
 export interface EngineEval {

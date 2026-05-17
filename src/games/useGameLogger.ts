@@ -1,4 +1,5 @@
-import { useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
+import { toast } from 'sonner'
 import type { UseChessGameResult } from '@/lib/useChessGame'
 import { analyzePosition } from '@/engine/analysisEngine'
 import {
@@ -7,9 +8,10 @@ import {
   updateMove,
   setGamePgn,
   finalizeGame,
+  getGame,
 } from './gameStore'
 import { classify } from './classification'
-import type { GameResult } from './types'
+import type { CoachMessageRecord, GameResult } from './types'
 
 export interface GameLoggerInput {
   game: UseChessGameResult
@@ -22,6 +24,8 @@ export interface GameLoggerInput {
 
 export interface GameLoggerOutput {
   currentGameId: string | null
+  /** Imperatively append a coach message to the stored move at the given ply. */
+  appendCoachMessage: (ply: number, msg: CoachMessageRecord) => void
 }
 
 function mapGameResult(game: UseChessGameResult): GameResult {
@@ -37,6 +41,7 @@ export function useGameLogger(input: GameLoggerInput): GameLoggerOutput {
   const currentGameIdRef = useRef<string | null>(null)
   const prevHistoryLengthRef = useRef(0)
   const prevIsGameOverRef = useRef(false)
+  const gameSavedToastedRef = useRef<string | null>(null)
 
   // Capture stable refs so the async callbacks don't close over stale values
   const coachMessageRef = useRef(coachMessage)
@@ -147,6 +152,11 @@ export function useGameLogger(input: GameLoggerInput): GameLoggerOutput {
     if ((wasReset || justEnded) && currentGameIdRef.current !== null) {
       const result = mapGameResult(game)
       finalizeGame(currentGameIdRef.current, result, game.pgn)
+      // Fire game-saved toast once per game (keyed by game id)
+      if (justEnded && gameSavedToastedRef.current !== currentGameIdRef.current) {
+        gameSavedToastedRef.current = currentGameIdRef.current
+        toast.success('Game saved')
+      }
       if (wasReset) {
         currentGameIdRef.current = null
       }
@@ -156,5 +166,15 @@ export function useGameLogger(input: GameLoggerInput): GameLoggerOutput {
     prevIsGameOverRef.current = isOver
   })
 
-  return { currentGameId: currentGameIdRef.current }
+  const appendCoachMessage = useCallback((ply: number, msg: CoachMessageRecord): void => {
+    const gameId = currentGameIdRef.current
+    if (!gameId) return
+    const game = getGame(gameId)
+    if (!game) return
+    const move = game.moves.find((m) => m.ply === ply)
+    const existing = move?.coach_messages ?? []
+    updateMove(gameId, ply, { coach_messages: [...existing, msg] })
+  }, [])
+
+  return { currentGameId: currentGameIdRef.current, appendCoachMessage }
 }
