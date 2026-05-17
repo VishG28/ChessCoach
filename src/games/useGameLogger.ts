@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, type MutableRefObject } from 'react'
 import { toast } from 'sonner'
 import type { UseChessGameResult } from '@/lib/useChessGame'
 import { analyzePosition } from '@/engine/analysisEngine'
@@ -11,7 +11,13 @@ import {
   getGame,
 } from './gameStore'
 import { classify } from './classification'
-import type { CoachMessageRecord, GameResult } from './types'
+import type { CoachMessageRecord, GameResult, MoveSource } from './types'
+
+export interface OpponentMoveMeta {
+  source: MoveSource
+  engineModel: string
+  bookWeight?: number
+}
 
 export interface GameLoggerInput {
   game: UseChessGameResult
@@ -20,6 +26,13 @@ export interface GameLoggerInput {
   coachMode: 'off' | 'warnings' | 'full'
   /** Last coach message keyed by ply. */
   coachMessage?: { ply: number; text: string } | null
+  /**
+   * Provenance metadata for the most recently selected opponent move.
+   * The logger reads this ref when it observes a new opponent move in
+   * `game.history` and then clears it so the value cannot leak to a
+   * subsequent move.
+   */
+  lastOpponentMetaRef?: MutableRefObject<OpponentMoveMeta | null>
 }
 
 export interface GameLoggerOutput {
@@ -36,7 +49,7 @@ function mapGameResult(game: UseChessGameResult): GameResult {
 }
 
 export function useGameLogger(input: GameLoggerInput): GameLoggerOutput {
-  const { game, engineElo, userColor, coachMode, coachMessage } = input
+  const { game, engineElo, userColor, coachMode, coachMessage, lastOpponentMetaRef } = input
 
   const currentGameIdRef = useRef<string | null>(null)
   const prevHistoryLengthRef = useRef(0)
@@ -46,6 +59,8 @@ export function useGameLogger(input: GameLoggerInput): GameLoggerOutput {
   // Capture stable refs so the async callbacks don't close over stale values
   const coachMessageRef = useRef(coachMessage)
   coachMessageRef.current = coachMessage
+
+  const userColorChar: 'w' | 'b' = userColor === 'white' ? 'w' : 'b'
 
   useEffect(() => {
     const currentLen = game.history.length
@@ -71,7 +86,19 @@ export function useGameLogger(input: GameLoggerInput): GameLoggerOutput {
         const fen_before = move.before
         const fen_after = move.after
 
-        // Append synchronously with basic fields
+        // Determine provenance: user vs opponent.
+        // Opponent meta comes from the lastOpponentMetaRef (set by PlayPage just
+        // before makeMove). Consumed once, then cleared to avoid leaking into
+        // the next move.
+        const isUserMove = side === userColorChar
+        let meta: OpponentMoveMeta | null = null
+        if (!isUserMove && lastOpponentMetaRef?.current) {
+          meta = lastOpponentMetaRef.current
+          lastOpponentMetaRef.current = null
+        }
+        const sourceField: MoveSource = isUserMove ? 'user' : (meta?.source ?? 'stockfish')
+
+        // Append synchronously with basic fields + provenance
         appendMove(gameId, {
           ply,
           san: move.san,
@@ -80,6 +107,9 @@ export function useGameLogger(input: GameLoggerInput): GameLoggerOutput {
           fen_after,
           timestamp: Date.now(),
           side,
+          source: sourceField,
+          ...(meta?.engineModel ? { engineModel: meta.engineModel } : {}),
+          ...(meta?.bookWeight !== undefined ? { bookWeight: meta.bookWeight } : {}),
         })
 
         // Fire-and-forget async analysis

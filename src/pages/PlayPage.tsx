@@ -20,10 +20,14 @@ import type { BlunderContext } from '@/coaching/llmCoach'
 import { useEngine, parseUciMove } from '@/engine/engine'
 import { useChessGame } from '@/lib/useChessGame'
 import { getWeakeningParams, humanThinkDelay, selectMove } from '@/engine/weakening'
-import { useGameLogger } from '@/games/useGameLogger'
+import { useGameLogger, type OpponentMoveMeta } from '@/games/useGameLogger'
 import { useDeepCoach, uciPvToSan, uciToSan, type LiveCoachMessage } from '@/coaching/useDeepCoach'
 import type { CandidateLine, CoachingStyle, PreMoveContext } from '@/coaching/deepCoach'
 import { useShortcut } from '@/lib/shortcuts'
+import { getBookMove } from '@/engine/openingBook'
+import type { MoveSource } from '@/games/types'
+
+const STOCKFISH_MODEL_ID = 'stockfish-18'
 
 /** Convert a UCI move to SAN given a FEN. Returns UCI string unchanged on failure. */
 function uciToSanLocal(fen: string, uci: string): string {
@@ -158,6 +162,10 @@ export function PlayPage() {
     enabled: blunderAlert !== null && coachMode === 'full',
   })
 
+  // Provenance metadata for the next opponent move. PlayPage sets this before
+  // calling makeMove; useGameLogger reads and clears it as it persists the move.
+  const lastOpponentMetaRef = useRef<OpponentMoveMeta | null>(null)
+
   // Log every move to persistent game storage with background analysis
   const { appendCoachMessage } = useGameLogger({
     game,
@@ -167,6 +175,7 @@ export function PlayPage() {
     coachMessage: coach.blunderAlert
       ? { ply: game.history.length, text: `Blunder: ${coach.blunderAlert.san} lost ${coach.blunderAlert.loss}cp. Engine prefers ${coach.blunderAlert.better}.` }
       : null,
+    lastOpponentMetaRef,
   })
 
   // Refs for the current pre/post move context so Tell Me More can reference them
@@ -272,33 +281,57 @@ export function PlayPage() {
     const params = getWeakeningParams(elo)
     const evalCp = coach.liveEval?.cp
     const fenBefore = game.fen
+    // The ply about to be played (history length grows by 1 after makeMove).
+    const ply = game.history.length + 1
 
     setEngineThinking(true)
     void (async () => {
       try {
         const startedAt = performance.now()
-        const move = await engine.requestMove({
-          fen: fenBefore,
-          depth: params.depth,
-          movetime: params.movetime,
-          multipv: params.multipv,
-        })
+
+        // 1. Try the Lichess opening book first.
+        let chosenUci: string | null = null
+        let source: MoveSource = 'stockfish'
+        let bookWeight: number | undefined
+        let rollLabel: 'best' | 'random' | 'blunder' | 'filtered' = 'best'
+        let cpBest = 0
+
+        const book = await getBookMove(fenBefore, elo, ply)
         if (engineRequestIdRef.current !== requestId) return
+        if (book) {
+          chosenUci = book.uci
+          source = 'book'
+          bookWeight = book.weight
+        } else {
+          // 2. Fall back to the Stockfish weakening pipeline.
+          const move = await engine.requestMove({
+            fen: fenBefore,
+            depth: params.depth,
+            movetime: params.movetime,
+            multipv: params.multipv,
+          })
+          if (engineRequestIdRef.current !== requestId) return
 
-        const fallbackUci = `${move.from}${move.to}${move.promotion ?? ''}`
-        const candidates =
-          move.topCandidates && move.topCandidates.length > 0
-            ? move.topCandidates
-            : [{ move: fallbackUci, cp: 0, pv: [] }]
+          const fallbackUci = `${move.from}${move.to}${move.promotion ?? ''}`
+          const candidates =
+            move.topCandidates && move.topCandidates.length > 0
+              ? move.topCandidates
+              : [{ move: fallbackUci, cp: 0, pv: [] }]
 
-        const result = selectMove({
-          candidates,
-          randomMoveChance: params.randomMoveChance,
-          blunderChance: params.blunderChance,
-          fenBefore,
-          eloForSanity: elo,
-          evalCp,
-        })
+          const result = selectMove({
+            candidates,
+            randomMoveChance: params.randomMoveChance,
+            blunderChance: params.blunderChance,
+            fenBefore,
+            eloForSanity: elo,
+            evalCp,
+          })
+          chosenUci = result.uci
+          rollLabel = result.roll
+          cpBest = result.cpBest
+        }
+
+        if (!chosenUci) return
 
         // Wait for human-feel think time, measured from request start.
         const elapsed = performance.now() - startedAt
@@ -306,7 +339,15 @@ export function PlayPage() {
         if (wait > 0) await new Promise((r) => setTimeout(r, wait))
         if (engineRequestIdRef.current !== requestId) return
 
-        const chosen = parseUciMove(result.uci)
+        // Record provenance for the debug overlay and the logger.
+        engine.recordOpponentSource(source)
+        lastOpponentMetaRef.current = {
+          source,
+          engineModel: STOCKFISH_MODEL_ID,
+          ...(bookWeight !== undefined ? { bookWeight } : {}),
+        }
+
+        const chosen = parseUciMove(chosenUci)
         game.makeMove({
           from: chosen.from as Square,
           to: chosen.to as Square,
@@ -314,9 +355,9 @@ export function PlayPage() {
         })
 
         const lastEntry = game.history[game.history.length - 1]
-        if (lastEntry && engine) {
-          engine.recordEngineMoveSan(result.uci, lastEntry.san)
-          engine.recordRoll(result.uci, result.roll, result.cpBest)
+        if (lastEntry && engine && source === 'stockfish') {
+          engine.recordEngineMoveSan(chosenUci, lastEntry.san)
+          engine.recordRoll(chosenUci, rollLabel, cpBest)
         }
       } catch {
         // Engine disposed mid-request, or transport error. Silent fail —
