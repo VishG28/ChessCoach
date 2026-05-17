@@ -61,6 +61,37 @@ export function DebugOverlay({ engine, elo }: DebugOverlayProps) {
           )
         })
       )}
+      {state.lastAnalysis && state.lastAnalysis.length > 0 && (
+        <div className="mt-2 border-t border-zinc-700 pt-2">
+          <div className="text-xs font-medium mb-1">Top MultiPV candidates</div>
+          <table className="text-xs w-full">
+            <thead>
+              <tr className="text-zinc-400">
+                <th className="text-left">#</th>
+                <th className="text-left">UCI</th>
+                <th className="text-right">cp</th>
+                <th className="text-left">PV (first 4)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {state.lastAnalysis.slice(0, 5).map((c, i) => (
+                <tr key={i}>
+                  <td>{i + 1}</td>
+                  <td className="font-mono">{c.move}</td>
+                  <td className="text-right">{c.cp}</td>
+                  <td className="font-mono">{c.pv.slice(0, 4).join(' ')}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {state.lastOpponentSource && (
+        <div className="mt-1 text-xs">
+          Last opponent move source:{' '}
+          <span className="font-mono">{state.lastOpponentSource}</span>
+        </div>
+      )}
       <Separator className="my-2 bg-zinc-700" />
       <div className="font-semibold mb-1">Recent UCI commands</div>
       <div className="text-zinc-400 max-h-24 overflow-auto whitespace-pre-wrap">

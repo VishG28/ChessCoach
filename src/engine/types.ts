@@ -33,6 +33,10 @@ export interface EngineDebugState {
     /** Engine's best-eval (multipv index 1) at the time the move was chosen. */
     cpBest?: number
   }>
+  /** Last multipv analysis results (sorted best→worst). */
+  lastAnalysis?: TopCandidate[]
+  /** Source of the last opponent move. */
+  lastOpponentSource?: 'book' | 'stockfish' | 'maia'
 }
 
 export interface EngineEval {

@@ -122,6 +122,10 @@ export class Engine {
     this.updateDebug({ recentMoves: moves })
   }
 
+  recordOpponentSource(source: 'book' | 'stockfish' | 'maia'): void {
+    this.updateDebug({ lastOpponentSource: source })
+  }
+
   private updateDebug(patch: Partial<EngineDebugState>): void {
     this.debugState = { ...this.debugState, ...patch }
     const snapshot = this.getDebugState()
@@ -302,6 +306,7 @@ export class Engine {
         eval: topEval,
         candidates: sorted,
       }
+      this.updateDebug({ lastAnalysis: sorted })
       this.finishActive(result)
     } else {
       const result: EngineEval = {
