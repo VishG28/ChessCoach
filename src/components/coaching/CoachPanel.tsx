@@ -4,6 +4,7 @@ import type {
   ThreatenedPiece,
 } from '@/coaching/threats'
 import type { BlunderAlert } from '@/coaching/useCoach'
+import type { UseExplainResult } from '@/coaching/useExplain'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -13,6 +14,7 @@ import {
 } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { cn } from '@/lib/utils'
+import { ExplainBox } from './ExplainBox'
 
 export interface CoachPanelProps {
   mode: 'off' | 'warnings' | 'full'
@@ -22,6 +24,8 @@ export interface CoachPanelProps {
   thinking: boolean
   onDismissAlert: () => void
   onTakeBackBlunder: () => void
+  /** LLM/rule explanation result to show in the blunder card. Only used when mode === 'full'. */
+  explain?: UseExplainResult
 }
 
 const PIECE_GLYPH: Record<PieceSymbol, string> = {
@@ -59,6 +63,7 @@ export function CoachPanel({
   thinking,
   onDismissAlert,
   onTakeBackBlunder,
+  explain,
 }: CoachPanelProps) {
   const isOff = mode === 'off'
 
@@ -113,6 +118,7 @@ export function CoachPanel({
               mode={mode}
               onDismiss={onDismissAlert}
               onTakeBack={onTakeBackBlunder}
+              explain={explain}
             />
           </>
         )}
@@ -236,6 +242,7 @@ interface AfterMoveSectionProps {
   mode: 'warnings' | 'full'
   onDismiss: () => void
   onTakeBack: () => void
+  explain?: UseExplainResult
 }
 
 function AfterMoveSection({
@@ -243,6 +250,7 @@ function AfterMoveSection({
   mode,
   onDismiss,
   onTakeBack,
+  explain,
 }: AfterMoveSectionProps) {
   if (alert == null) {
     if (mode === 'full') {
@@ -262,22 +270,31 @@ function AfterMoveSection({
     <section className="space-y-2">
       <span className={SECTION_LABEL}>After your move</span>
       <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 shadow-sm">
-        <div className="flex items-start justify-between gap-4">
-          <div className="space-y-1">
-            <div className="flex items-baseline gap-2">
-              <span className="rounded bg-amber-200/70 px-1.5 py-0.5 font-mono text-sm font-semibold text-amber-900">
-                {alert.san}
-              </span>
-              <span className="font-mono text-sm font-semibold text-amber-900 tabular-nums">
-                −{lossPawns}
-              </span>
-            </div>
-            <p className="text-sm text-amber-900/90">
-              Engine prefers{' '}
-              <span className="font-mono font-semibold">{alert.better}</span>.
-            </p>
+        <div className="space-y-1">
+          <div className="flex items-baseline gap-2">
+            <span className="rounded bg-amber-200/70 px-1.5 py-0.5 font-mono text-sm font-semibold text-amber-900">
+              {alert.san}
+            </span>
+            <span className="font-mono text-sm font-semibold text-amber-900 tabular-nums">
+              −{lossPawns}
+            </span>
           </div>
+          <p className="text-sm text-amber-900/90">
+            Engine prefers{' '}
+            <span className="font-mono font-semibold">{alert.better}</span>.
+          </p>
         </div>
+        {mode === 'full' && explain && (
+          <div className="mt-3">
+            <ExplainBox
+              text={explain.text}
+              source={explain.source}
+              loading={explain.loading}
+              error={explain.error}
+              onRegenerate={explain.regenerate}
+            />
+          </div>
+        )}
         <div className="mt-3 flex gap-2">
           <Button type="button" size="sm" onClick={onTakeBack}>
             Take it back

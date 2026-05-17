@@ -22,6 +22,10 @@ export interface BlunderAlert {
   loss: number
   /** Engine's preferred move at the prior position (UCI). */
   better: string
+  /** Principal variation from the engine's preferred move (UCI strings, first 4). */
+  pv: string[]
+  /** FEN before the user's blundering move. */
+  fenBefore: string
 }
 
 export interface UseCoachOptions {
@@ -136,7 +140,13 @@ export function useCoach(opts: UseCoachOptions): UseCoachResult {
       if (prev && next) {
         const loss = cpLoss(prev, next)
         if (isBlunder(loss)) {
-          setBlunderAlert({ san: lastMove.san, loss, better: prev.bestMove })
+          setBlunderAlert({
+            san: lastMove.san,
+            loss,
+            better: prev.bestMove,
+            pv: prev.pv.slice(0, 4),
+            fenBefore: beforeFen,
+          })
         } else {
           setBlunderAlert(null)
         }

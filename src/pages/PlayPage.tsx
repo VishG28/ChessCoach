@@ -1,8 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Chess } from 'chess.js'
 import type { Color, Square } from 'chess.js'
 import { useLocation } from 'react-router-dom'
 import { Board } from '@/components/board/Board'
 import { CoachPanel } from '@/components/coaching/CoachPanel'
+import { ApiKeyBanner } from '@/components/coaching/ApiKeyBanner'
 import {
   LeftSidebar,
   type CoachMode,
@@ -11,6 +13,9 @@ import {
 import { RightSidebar } from '@/components/sidebar/RightSidebar'
 import { DebugOverlay } from '@/components/debug/DebugOverlay'
 import { useCoach } from '@/coaching/useCoach'
+import { useApiKey } from '@/coaching/apiKey'
+import { useExplain } from '@/coaching/useExplain'
+import type { BlunderContext } from '@/coaching/llmCoach'
 import { useEngine, parseUciMove } from '@/engine/engine'
 import { useChessGame } from '@/lib/useChessGame'
 import {
@@ -21,6 +26,19 @@ import {
 } from '@/engine/eloCurves'
 import type { TopCandidate } from '@/engine/types'
 import { useGameLogger } from '@/games/useGameLogger'
+
+/** Convert a UCI move to SAN given a FEN. Returns UCI string unchanged on failure. */
+function uciToSanLocal(fen: string, uci: string): string {
+  try {
+    const chess = new Chess(fen)
+    const from = uci.slice(0, 2)
+    const to = uci.slice(2, 4)
+    const promotion = uci.length >= 5 ? (uci[4] as 'q' | 'r' | 'b' | 'n') : undefined
+    return chess.move({ from, to, promotion })?.san ?? uci
+  } catch {
+    return uci
+  }
+}
 
 const DEFAULT_ELO = 800
 const DEFAULT_COACH_MODE: CoachMode = 'warnings'
@@ -104,6 +122,65 @@ export function PlayPage() {
     mode: coachMode,
     userColor,
     evalDepth: 10,
+  })
+
+  // LLM explanation wiring
+  const { apiKey } = useApiKey()
+  const blunderAlert = coach.blunderAlert
+
+  // Build the BlunderContext only when there's an active blunder alert.
+  // Memoize on the alert's identity fields so we don't thrash useExplain.
+  const blunderCtx = useMemo<BlunderContext | null>(() => {
+    if (!blunderAlert || coachMode !== 'full') return null
+    const fenBefore = blunderAlert.fenBefore
+    const betterSan = uciToSanLocal(fenBefore, blunderAlert.better)
+    // Convert PV UCIs → SAN (up to 4) starting from fenBefore
+    const pvSan: string[] = []
+    try {
+      const pvChess = new Chess(fenBefore)
+      for (const uci of blunderAlert.pv.slice(0, 4)) {
+        const from = uci.slice(0, 2)
+        const to = uci.slice(2, 4)
+        const promotion = uci.length >= 5 ? (uci[4] as 'q' | 'r' | 'b' | 'n') : undefined
+        const m = pvChess.move({ from, to, promotion })
+        if (!m) break
+        pvSan.push(m.san)
+      }
+    } catch { /* ignore */ }
+    const recentMoves = game.history.slice(-6).map((m) => m.san)
+    return {
+      fen_before: fenBefore,
+      user_move: blunderAlert.san,
+      engine_best_move: betterSan,
+      engine_pv: pvSan,
+      centipawn_loss: blunderAlert.loss,
+      recent_moves: recentMoves,
+      user_elo: elo,
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [blunderAlert?.san, blunderAlert?.loss, blunderAlert?.fenBefore, coachMode, elo])
+
+  // UCI of the last user move for cache key
+  const lastUserUci = useMemo<string | null>(() => {
+    if (!blunderAlert) return null
+    const lastEntry = game.history[game.history.length - 1]
+    if (!lastEntry) return null
+    return `${lastEntry.from}${lastEntry.to}${lastEntry.promotion ?? ''}`
+  }, [blunderAlert, game.history])
+
+  // Rule-based fallback message
+  const ruleFallback = useMemo<string | null>(() => {
+    if (!blunderAlert) return null
+    const betterSan = uciToSanLocal(blunderAlert.fenBefore, blunderAlert.better)
+    const lossPawns = (blunderAlert.loss / 100).toFixed(2)
+    return `You played ${blunderAlert.san}, losing ${lossPawns} pawns of evaluation. The engine preferred ${betterSan}.`
+  }, [blunderAlert])
+
+  const explain = useExplain({
+    ctx: blunderCtx,
+    uci: lastUserUci,
+    ruleFallback,
+    enabled: blunderAlert !== null && coachMode === 'full',
   })
 
   // Log every move to persistent game storage with background analysis
@@ -230,8 +307,9 @@ export function PlayPage() {
   const activePly = game.history.length - 1
 
   return (
-    <div className="flex justify-center px-6 py-8">
-      <div className="flex gap-6 w-full max-w-[1180px]">
+    <div className="flex flex-col px-6 py-8">
+      <ApiKeyBanner coachMode={coachMode} hasKey={apiKey !== null} />
+      <div className="flex gap-6 w-full max-w-[1180px] mx-auto">
         <aside className="w-64 shrink-0">
           <LeftSidebar
             elo={elo}
@@ -266,6 +344,7 @@ export function PlayPage() {
             thinking={coach.thinking}
             onDismissAlert={coach.dismissAlert}
             onTakeBackBlunder={handleTakeBack}
+            explain={explain}
           />
         </main>
 
