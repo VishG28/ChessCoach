@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react'
+import { toast } from 'sonner'
 import type { UseChessGameResult } from '@/lib/useChessGame'
 import { analyzePosition } from '@/engine/analysisEngine'
 import {
@@ -40,6 +41,7 @@ export function useGameLogger(input: GameLoggerInput): GameLoggerOutput {
   const currentGameIdRef = useRef<string | null>(null)
   const prevHistoryLengthRef = useRef(0)
   const prevIsGameOverRef = useRef(false)
+  const gameSavedToastedRef = useRef<string | null>(null)
 
   // Capture stable refs so the async callbacks don't close over stale values
   const coachMessageRef = useRef(coachMessage)
@@ -150,6 +152,11 @@ export function useGameLogger(input: GameLoggerInput): GameLoggerOutput {
     if ((wasReset || justEnded) && currentGameIdRef.current !== null) {
       const result = mapGameResult(game)
       finalizeGame(currentGameIdRef.current, result, game.pgn)
+      // Fire game-saved toast once per game (keyed by game id)
+      if (justEnded && gameSavedToastedRef.current !== currentGameIdRef.current) {
+        gameSavedToastedRef.current = currentGameIdRef.current
+        toast.success('Game saved')
+      }
       if (wasReset) {
         currentGameIdRef.current = null
       }
