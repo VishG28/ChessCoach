@@ -24,7 +24,10 @@ export function useShortcut(combo: string, handler: () => void, opts: ShortcutOp
       const mod = isMac ? e.metaKey : e.ctrlKey
       if (wantMod && !mod) return
       if (!wantMod && (e.metaKey || e.ctrlKey)) return
-      if (wantShift !== e.shiftKey) return
+      // Shift is only enforced when the combo requests it. Printable keys that
+      // require Shift to produce (e.g. "?", "!") arrive as the shifted glyph
+      // in e.key, so the key comparison below already encodes that state.
+      if (wantShift && !e.shiftKey) return
       if (wantAlt !== e.altKey) return
       if (e.key.toLowerCase() !== key) return
       e.preventDefault()
