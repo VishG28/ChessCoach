@@ -9,6 +9,8 @@ import {
   setGamePgn,
   finalizeGame,
   getGame,
+  clearGameCoaching,
+  restoreGameCoaching,
 } from './gameStore'
 import { classify } from './classification'
 import type { CoachMessageRecord, GameResult, MoveSource } from './types'
@@ -199,12 +201,39 @@ export function useGameLogger(input: GameLoggerInput): GameLoggerOutput {
     const justEnded = isOver && !prevIsGameOverRef.current && currentLen > 0
 
     if ((wasReset || justEnded) && currentGameIdRef.current !== null) {
+      const finalizedGameId = currentGameIdRef.current
       const result = mapGameResult(game)
-      finalizeGame(currentGameIdRef.current, result, game.pgn)
+      finalizeGame(finalizedGameId, result, game.pgn)
       // Fire game-saved toast once per game (keyed by game id)
-      if (justEnded && gameSavedToastedRef.current !== currentGameIdRef.current) {
-        gameSavedToastedRef.current = currentGameIdRef.current
-        toast.success('Game saved')
+      if (justEnded && gameSavedToastedRef.current !== finalizedGameId) {
+        gameSavedToastedRef.current = finalizedGameId
+        const keepCoaching = ((): boolean => {
+          try {
+            return localStorage.getItem('cc.keepCoaching.v1') === '1'
+          } catch {
+            return false
+          }
+        })()
+
+        if (!keepCoaching) {
+          const snapshot = clearGameCoaching(finalizedGameId)
+          toast('Game saved. Coaching cleared.', {
+            duration: 10000,
+            ...(snapshot
+              ? {
+                  action: {
+                    label: 'Undo',
+                    onClick: () => {
+                      restoreGameCoaching(finalizedGameId, snapshot)
+                      toast.success('Coaching restored')
+                    },
+                  },
+                }
+              : {}),
+          })
+        } else {
+          toast.success('Game saved')
+        }
       }
       if (wasReset) {
         currentGameIdRef.current = null

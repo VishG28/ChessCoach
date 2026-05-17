@@ -125,3 +125,38 @@ export function finalizeGame(gameId: string, result: GameResult, pgn: string): v
   all[idx] = { ...all[idx], result, pgn, endedAt: Date.now() }
   writeAll(all)
 }
+
+/**
+ * Clear all coaching messages from a game's moves. Returns a deep snapshot of
+ * the moves BEFORE clearing so the caller can pass it to `restoreGameCoaching`
+ * for an undo. Returns null if no such game exists.
+ */
+export function clearGameCoaching(gameId: string): MoveEntry[] | null {
+  const all = readAll()
+  const idx = all.findIndex((g) => g.id === gameId)
+  if (idx === -1) return null
+  const snapshot: MoveEntry[] = all[idx].moves.map((m) => ({ ...m }))
+  const updated: Game = {
+    ...all[idx],
+    moves: all[idx].moves.map((m) => ({
+      ...m,
+      coach_messages: [],
+      coach_message: undefined,
+    })),
+  }
+  all[idx] = updated
+  writeAll(all)
+  return snapshot
+}
+
+/**
+ * Restore a previously captured moves snapshot to a game. No-op if the game
+ * does not exist.
+ */
+export function restoreGameCoaching(gameId: string, snapshot: MoveEntry[]): void {
+  const all = readAll()
+  const idx = all.findIndex((g) => g.id === gameId)
+  if (idx === -1) return
+  all[idx] = { ...all[idx], moves: snapshot }
+  writeAll(all)
+}
