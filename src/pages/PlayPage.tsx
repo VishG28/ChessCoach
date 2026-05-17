@@ -4,7 +4,6 @@ import type { Color, Square } from 'chess.js'
 import { useLocation } from 'react-router-dom'
 import { Board } from '@/components/board/Board'
 import { CoachPanel } from '@/components/coaching/CoachPanel'
-import { ApiKeyBanner } from '@/components/coaching/ApiKeyBanner'
 import {
   LeftSidebar,
   type CoachMode,
@@ -109,8 +108,10 @@ export function PlayPage() {
     evalDepth: 10,
   })
 
-  // LLM explanation wiring
-  const { apiKey } = useApiKey()
+  // LLM explanation wiring (key is held in memory only, accessed lazily)
+  // hasKey is referenced by useExplain via useApiKey() but we expose it for
+  // future deep-coach gating in Wave 4.
+  useApiKey()
   const blunderAlert = coach.blunderAlert
 
   // Build the BlunderContext only when there's an active blunder alert.
@@ -301,7 +302,7 @@ export function PlayPage() {
 
   return (
     <div className="flex flex-col px-6 py-8">
-      <ApiKeyBanner coachMode={coachMode} hasKey={apiKey !== null} />
+      {/* API key banner removed — top-bar ApiKeyButton handles the CTA. */}
       <div className="flex gap-6 w-full max-w-[1180px] mx-auto">
         <aside className="w-64 shrink-0">
           <LeftSidebar

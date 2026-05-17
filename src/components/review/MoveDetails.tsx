@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import { Chess } from 'chess.js'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import type { Game, MoveEntry } from '@/games/types'
 import { CLASS_BG, CLASS_LABEL } from '@/games/classification'
 import { Button } from '@/components/ui/button'
@@ -31,7 +31,7 @@ function uciToSan(fen: string, uci: string): string {
 
 export function MoveDetails({ game, move, selectedPly }: MoveDetailsProps) {
   const navigate = useNavigate()
-  const { apiKey } = useApiKey()
+  const { hasKey } = useApiKey()
   const [triggered, setTriggered] = useState(false)
 
   // Reset explanation state when the selected move changes
@@ -196,12 +196,16 @@ export function MoveDetails({ game, move, selectedPly }: MoveDetailsProps) {
           Explain this move
         </Button>
       </div>
-      {!apiKey && !triggered && (
+      {!hasKey && !triggered && (
         <p className="text-xs text-zinc-500 mt-1">
           No API key set —{' '}
-          <Link to="/settings" className="underline">
-            add one in Settings
-          </Link>{' '}
+          <button
+            type="button"
+            onClick={() => window.dispatchEvent(new Event('cc:open-api-key'))}
+            className="underline"
+          >
+            add one
+          </button>{' '}
           for AI explanations, or click to see rule-based feedback.
         </p>
       )}

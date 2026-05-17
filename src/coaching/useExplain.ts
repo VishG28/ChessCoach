@@ -25,7 +25,7 @@ interface Args {
 }
 
 export function useExplain({ ctx, uci, ruleFallback, enabled }: Args): UseExplainResult {
-  const { apiKey, llmEnabled } = useApiKey()
+  const { hasKey, getKey } = useApiKey()
   const [text, setText] = useState<string | null>(null)
   const [source, setSource] = useState<ExplainSource | null>(null)
   const [loading, setLoading] = useState(false)
@@ -51,12 +51,13 @@ export function useExplain({ ctx, uci, ruleFallback, enabled }: Args): UseExplai
         return
       }
     }
-    // 2. Try LLM if conditions are right
-    if (apiKey && llmEnabled) {
+    // 2. Try LLM if a key is present in memory
+    const key = hasKey ? getKey() : null
+    if (key) {
       const controller = new AbortController()
       setLoading(true)
       setError(null)
-      explainBlunder(ctx, apiKey, controller.signal)
+      explainBlunder(ctx, key, controller.signal)
         .then((t) => {
           setText(t)
           setSource('llm')
@@ -68,7 +69,6 @@ export function useExplain({ ctx, uci, ruleFallback, enabled }: Args): UseExplai
           const msg = e instanceof Error ? e.message : 'Unknown error'
           setError(msg)
           setLoading(false)
-          // Fall back to rule
           if (ruleFallback) {
             setText(ruleFallback)
             setSource('rule')
@@ -79,7 +79,7 @@ export function useExplain({ ctx, uci, ruleFallback, enabled }: Args): UseExplai
         })
       return () => controller.abort()
     }
-    // 3. No key or LLM disabled → rule fallback
+    // 3. No key → rule fallback
     if (ruleFallback) {
       setText(ruleFallback)
       setSource('rule')
@@ -92,7 +92,7 @@ export function useExplain({ ctx, uci, ruleFallback, enabled }: Args): UseExplai
       setError(null)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, ctx?.fen_before, uci, apiKey, llmEnabled, bust])
+  }, [enabled, ctx?.fen_before, uci, hasKey, bust])
 
   return { text, source, loading, error, regenerate: () => setBust((b) => b + 1) }
 }

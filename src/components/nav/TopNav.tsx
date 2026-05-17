@@ -1,19 +1,20 @@
 import { NavLink } from 'react-router-dom'
 import { cn } from '@/lib/utils'
+import { ApiKeyButton } from '@/components/coaching/ApiKeyButton'
 
 const LINKS = [
   { to: '/', label: 'Play' },
-  { to: '/games', label: 'Games' },
+  { to: '/games', label: 'Review' },
   { to: '/openings', label: 'Openings' },
-  { to: '/settings', label: 'Settings' },
+  ...(import.meta.env.DEV ? [{ to: '/calibrate', label: 'Calibrate' }] : []),
 ]
 
 export function TopNav() {
   return (
-    <header className="border-b border-zinc-200 bg-white/70 backdrop-blur">
-      <div className="max-w-[1180px] mx-auto flex items-center justify-between px-6 py-3">
-        <div className="font-semibold text-lg tracking-tight">ChessCoach</div>
-        <nav className="flex gap-1">
+    <header className="sticky top-0 z-30 h-14 border-b bg-background/80 backdrop-blur">
+      <div className="mx-auto flex h-full max-w-[1280px] items-center justify-between gap-4 px-6">
+        <div className="font-semibold tracking-tight">Chess Coach</div>
+        <nav className="hidden md:flex gap-1">
           {LINKS.map(({ to, label }) => (
             <NavLink
               key={to}
@@ -23,8 +24,8 @@ export function TopNav() {
                 cn(
                   'px-3 py-1.5 rounded-md text-sm transition-colors',
                   isActive
-                    ? 'bg-zinc-900 text-white'
-                    : 'text-zinc-700 hover:bg-zinc-100',
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:bg-accent hover:text-foreground',
                 )
               }
             >
@@ -32,6 +33,9 @@ export function TopNav() {
             </NavLink>
           ))}
         </nav>
+        <div className="flex items-center gap-2">
+          <ApiKeyButton />
+        </div>
       </div>
     </header>
   )

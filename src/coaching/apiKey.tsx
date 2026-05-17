@@ -1,14 +1,18 @@
-import { createContext, useContext, useState, type ReactNode } from 'react'
-
-const SESSION_KEY = 'cc.apiKey'
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react'
 
 interface ApiKeyContextValue {
-  apiKey: string | null
-  /** True if the user opted into sessionStorage persistence for this tab. */
-  persist: boolean
-  setApiKey: (key: string | null, persist?: boolean) => void
-  llmEnabled: boolean
-  setLlmEnabled: (b: boolean) => void
+  /** True iff the user supplied a key in this tab session. */
+  hasKey: boolean
+  /** Accessor for the key. Never store the returned value in component state. */
+  getKey: () => string | null
+  setKey: (key: string | null) => void
 }
 
 const ApiKeyContext = createContext<ApiKeyContextValue | null>(null)
@@ -20,32 +24,19 @@ export function useApiKey(): ApiKeyContextValue {
 }
 
 export function ApiKeyProvider({ children }: { children: ReactNode }) {
-  // Hydrate from sessionStorage only if a previous render set it (opt-in).
-  const initial = (() => {
-    try {
-      const v = sessionStorage.getItem(SESSION_KEY)
-      return v && v.length > 0 ? v : null
-    } catch {
-      return null
-    }
-  })()
-  const [apiKey, setKey] = useState<string | null>(initial)
-  const [persist, setPersist] = useState<boolean>(initial !== null)
-  const [llmEnabled, setLlmEnabled] = useState<boolean>(true)
+  // Hold the raw key in a ref so it never lands in React state inspectors / devtools.
+  const keyRef = useRef<string | null>(null)
+  const [hasKey, setHasKey] = useState(false)
 
-  const setApiKey = (key: string | null, doPersist: boolean = false): void => {
-    setKey(key)
-    setPersist(Boolean(doPersist && key))
-    try {
-      if (doPersist && key) sessionStorage.setItem(SESSION_KEY, key)
-      else sessionStorage.removeItem(SESSION_KEY)
-    } catch {
-      /* sessionStorage unavailable — in-memory only */
-    }
-  }
+  const setKey = useCallback((key: string | null): void => {
+    keyRef.current = key && key.length > 0 ? key : null
+    setHasKey(keyRef.current !== null)
+  }, [])
+
+  const getKey = useCallback((): string | null => keyRef.current, [])
 
   return (
-    <ApiKeyContext.Provider value={{ apiKey, persist, setApiKey, llmEnabled, setLlmEnabled }}>
+    <ApiKeyContext.Provider value={{ hasKey, getKey, setKey }}>
       {children}
     </ApiKeyContext.Provider>
   )
