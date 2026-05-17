@@ -1,7 +1,9 @@
 import { NavLink } from 'react-router-dom'
+import { GitFork } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ApiKeyButton } from '@/components/coaching/ApiKeyButton'
 import { SessionCost } from './SessionCost'
+import { ThemeToggle } from './ThemeToggle'
 
 const LINKS = [
   { to: '/', label: 'Play' },
@@ -37,6 +39,16 @@ export function TopNav() {
         <div className="flex items-center gap-2">
           <SessionCost />
           <ApiKeyButton />
+          <ThemeToggle />
+          <a
+            href="https://github.com/VishG28/ChessCoach"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="GitHub"
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <GitFork className="size-4" />
+          </a>
         </div>
       </div>
     </header>
