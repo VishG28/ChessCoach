@@ -23,6 +23,7 @@ import { getWeakeningParams, humanThinkDelay, selectMove } from '@/engine/weaken
 import { useGameLogger } from '@/games/useGameLogger'
 import { useDeepCoach, type LiveCoachMessage } from '@/coaching/useDeepCoach'
 import type { CoachingStyle, PreMoveContext } from '@/coaching/deepCoach'
+import { useShortcut } from '@/lib/shortcuts'
 
 /** Convert a UCI move to SAN given a FEN. Returns UCI string unchanged on failure. */
 function uciToSanLocal(fen: string, uci: string): string {
@@ -79,23 +80,8 @@ export function PlayPage() {
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Backtick key toggles debug overlay (ignored when typing in inputs)
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key !== '`') return
-      const target = e.target as HTMLElement | null
-      if (
-        target?.tagName === 'INPUT' ||
-        target?.tagName === 'TEXTAREA' ||
-        target?.isContentEditable
-      ) {
-        return
-      }
-      setDebugOpen((v) => !v)
-    }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [])
+  // Power-user keyboard shortcuts (all auto-skipped when typing in inputs)
+  useShortcut('`', () => setDebugOpen((v) => !v))
 
   // Push strength to the engine whenever it changes (and once on ready).
   useEffect(() => {
@@ -374,7 +360,7 @@ export function PlayPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game.history.length, game.turn, userColor, coach.dismissAlert, deepCoach.cancel])
 
-  // Global event listeners for command palette / keyboard shortcuts
+  // Global event listeners for command palette
   useEffect(() => {
     const onNewGame = () => handleNewGame()
     const onTakeBack = () => handleTakeBack()
@@ -389,6 +375,16 @@ export function PlayPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [handleNewGame, handleTakeBack])
+
+  // Direct keyboard shortcuts (mirror the command palette actions)
+  useShortcut('mod+n', handleNewGame)
+  useShortcut('mod+z', handleTakeBack)
+  useShortcut('f', () =>
+    game.setOrientation(game.orientation === 'white' ? 'black' : 'white'),
+  )
+  useShortcut('mod+e', () =>
+    window.dispatchEvent(new Event('cc:open-api-key')),
+  )
 
   // Eval bar wants White-POV centipawns. EngineEval.cp is from side-to-move
   // POV at the evaluated FEN, which (for liveEval) corresponds to game.turn.

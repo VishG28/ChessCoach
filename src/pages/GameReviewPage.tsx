@@ -17,6 +17,7 @@ import { useDeepCoach } from '@/coaching/useDeepCoach'
 import type { LiveCoachMessage } from '@/coaching/useDeepCoach'
 import type { PreMoveContext } from '@/coaching/deepCoach'
 import { useApiKey } from '@/coaching/apiKey'
+import { useShortcut } from '@/lib/shortcuts'
 
 const STARTING_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
 const AUTOPLAY_INTERVAL_MS = 1000
@@ -101,25 +102,26 @@ export function GameReviewPage() {
     }
   }, [id])
 
-  // Keyboard navigation
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (!game) return
-      if (e.key === 'ArrowLeft') {
-        setSelectedPly((p) => Math.max(0, p - 1))
-        setAutoplaying(false)
-      } else if (e.key === 'ArrowRight') {
-        setSelectedPly((p) => Math.min(game.moves.length, p + 1))
-      } else if (e.key === 'Home') {
-        setSelectedPly(0)
-        setAutoplaying(false)
-      } else if (e.key === 'End') {
-        setSelectedPly(game.moves.length)
-      }
-    }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [game])
+  // Keyboard navigation via shared useShortcut hook
+  const maxPly = game?.moves.length ?? 0
+  useShortcut('arrowleft', () => {
+    if (!game) return
+    setSelectedPly((p) => Math.max(0, p - 1))
+    setAutoplaying(false)
+  })
+  useShortcut('arrowright', () => {
+    if (!game) return
+    setSelectedPly((p) => Math.min(maxPly, p + 1))
+  })
+  useShortcut('home', () => {
+    if (!game) return
+    setSelectedPly(0)
+    setAutoplaying(false)
+  })
+  useShortcut('end', () => {
+    if (!game) return
+    setSelectedPly(maxPly)
+  })
 
   // Autoplay
   useEffect(() => {
