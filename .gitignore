@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# Copied at build time from node_modules/onnxruntime-web/dist by scripts/copy-ort.sh
+public/ort/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
