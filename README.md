@@ -1,17 +1,24 @@
 # ChessCoach
 
-A chess training app for the 300–800 Elo player. Play against Stockfish at adjustable strength with rule-based blunder warnings and optional Claude-powered coaching, log every game with per-move evaluation, drill the London System and Caro-Kann Defense, and review games with an eval graph and engine alternatives.
+A chess training app for the 300–800 Elo player. Play against a properly-weakened Stockfish, get streaming multi-layer coaching from Claude Sonnet 4.6 (optional), review your games with an eval graph, and drill openings.
 
 **Live demo:** https://vishg28.github.io/ChessCoach/
 
+## Privacy
+
+**Your data never leaves your browser.** Game history is stored in `localStorage` on this device only. The Anthropic API key you optionally paste is held in memory for the current browser tab — it is never written to disk, `localStorage`, `sessionStorage`, cookies, or any server we control. Close the tab and it's gone. When you trigger an AI explanation, the key is sent only to `api.anthropic.com`.
+
 ## Features
 
-- **Play** — Adjustable Elo (300–2000) with calibrated weakening: Skill Level + depth + movetime + weighted-random candidate selection at low strength.
-- **Coach modes** — Off / Warnings (threats + captures) / Full (warnings + post-move blunder alerts + optional AI explanations).
-- **Game logging** — Every game is persisted to localStorage with per-move CP loss, classification (best / good / inaccuracy / mistake / blunder), and top 3 engine alternatives.
-- **Game review** — Eval graph, click-to-jump navigation, "Play from here", PGN export.
-- **Opening trainer** — London System (white) and Caro-Kann Defense (black) with mastery tracking and drill mode.
-- **AI explanations** — Bring your own Anthropic API key for Claude-coached blunder explanations (optional; rule-based fallback always available).
+- **Play vs. a properly weakened engine (Elo 300–2000)** — A custom weakening pipeline (`src/engine/weakening.ts`) layers depth limiting, movetime caps, and multipv-based candidate selection on top of Stockfish 18. At Elo 300 the engine plays at depth 1 with multipv 10, picks a random move 60 % of the time, and blunders 25 % of the time. Mate-in-1 and queen-hanging moves are sanity-filtered out (queen blunders are allowed below Elo 500 — that's realistic for a true beginner).
+- **Human-feel think time** — The engine always pauses 1.2–2.0 seconds before playing, even when its search finishes in 200 ms. Makes the game feel like you're playing a person.
+- **Three coach modes** — Off / Warnings (threats + capture suggestions) / Full (everything plus post-move blunder analysis).
+- **Deep multi-layer live coaching** — When Full mode is on and a key is set, Claude streams flowing 4–8-sentence paragraphs explaining what to look at, what your opponent might do, hidden patterns a beginner would miss, and obscure-but-useful strategic ideas. Three coaching styles: **Conversational** (default), **Socratic** (coach asks you questions), **Tactical drills** (single nudge per critical moment).
+- **Session cost counter** — Top-bar pill shows live Anthropic API spend in USD for the tab. Resets on tab close.
+- **Game review** — Every game persists to `localStorage` with per-move CP loss, classification, top engine alternatives, and any coach messages you received during play. Reviewable in a side-by-side board + eval-graph view.
+- **Opening trainer** — London System (white) and Caro-Kann Defense (black) with mastery tracking and a Random Drill mode.
+- **Dark theme by default**, light theme one click away.
+- **Power-user shortcuts** — `Cmd/Ctrl+K` for the command palette, `?` for the cheatsheet, `Cmd/Ctrl+N` new game, `Cmd/Ctrl+Z` take back, `F` flip board, arrows step through review moves, `` ` `` toggles engine debug overlay.
 
 ## Local development
 
@@ -20,7 +27,7 @@ npm install
 npm run dev
 ```
 
-Visit http://localhost:5173.
+Visit `http://localhost:5173/ChessCoach/` (note the base path).
 
 ### Build & preview
 
@@ -29,37 +36,51 @@ npm run build
 npm run preview
 ```
 
+### Tests
+
+Engine weakening logic has unit tests via Node's built-in test runner:
+
+```bash
+node --test --experimental-strip-types src/engine/__tests__/weakening.test.ts
+```
+
 ### Debug overlay
 
-Press the backtick (\`) key during play to toggle a debug panel showing the current Skill Level, depth, movetime, MultiPV, randomness, last 5 engine moves with their evals, and the most recent UCI commands sent.
+Press `` ` `` (backtick) during play to toggle a debug panel showing the current Elo, Skill Level, depth, movetime, MultiPV, randomness, and the last 5 engine moves with their roll outcomes (`best` / `random` / `blunder` / `filtered`) and best-vs-played centipawn differences.
+
+### Calibration (dev only)
+
+A dev-only route `/calibrate` runs Stockfish-vs-Stockfish at each Elo bucket (300, 500, 800, 1100, 1500, 2000) against a full-strength engine. Configurable games per bucket (default 3); cancellable. Helps verify the weakening table is producing the expected win-rate curve. Hidden in production builds.
 
 ## Anthropic API key (optional)
 
-The AI coaching feature uses Claude Sonnet 4.6 directly from the browser. To use it:
+To enable AI coaching:
 
-1. Open the running app and navigate to **Settings**.
-2. Paste an Anthropic API key (starts with `sk-ant-`).
-3. Optionally tick "Remember for this session" — the key stays in `sessionStorage` and clears when you close the tab. Otherwise it's held in memory only.
-4. Click **Test** to verify the key works.
-5. Enable **Coach: Full** in the left sidebar.
+1. Click **Add API Key** in the top-right corner.
+2. Paste an Anthropic key (starts with `sk-ant-`). The dialog verifies it with a small ping request before accepting.
+3. The key is held in memory only for this browser tab. There is no "Remember" checkbox. Closing the tab clears it.
+4. Set Coach to **Full** in the left sidebar. Optional: pick a coaching style (Conversational / Socratic / Tactical drills).
 
-The key is sent only to `api.anthropic.com`. It is never persisted to disk or `localStorage`. Without a key, the app still produces rule-based blunder explanations.
+Typical cost for a 40-move game with full coaching: $0.30–$0.50 using Claude Sonnet 4.6 ($3/M input, $15/M output). The session pill in the top bar tracks running spend.
 
 ## Deployment
 
-The repo is configured to auto-deploy to GitHub Pages on every push to `main`:
+The repo auto-deploys to GitHub Pages on every push to `main`:
 
 1. `.github/workflows/deploy.yml` runs `npm ci && npm run build`.
-2. The `dist/` folder is published to the `gh-pages` branch via `peaceiris/actions-gh-pages@v3`.
-3. In repo Settings → Pages, ensure **Branch** is set to `gh-pages` and **Folder** to `/ (root)`.
+2. `dist/` publishes to the `gh-pages` branch via `peaceiris/actions-gh-pages@v3`.
+3. In repo **Settings → Pages**, set Branch to `gh-pages`, Folder to `/ (root)`.
 
-The Vite base path is `/ChessCoach/`, matching the repo name. A `public/404.html` SPA fallback preserves deep links across hard reloads.
+The Vite base path is `/ChessCoach/`. A `public/404.html` SPA fallback preserves deep links across hard reloads.
 
 ## Architecture
 
-- **Frontend:** Vite + React 19 + TypeScript + Tailwind CSS v4 + shadcn/ui
+- **Frontend:** Vite 8 + React 19 + TypeScript 6 + Tailwind v4 + shadcn/ui
 - **Chess:** chess.js (move validation) + chessground (board UI)
-- **Engine:** Stockfish 18 (WebAssembly) running in two workers — one for live play, one for background depth-12 analysis.
-- **Routing:** React Router v7
-- **Charts:** Recharts
-- **Storage:** localStorage (games, opening progress, LLM cache) and sessionStorage (API key, optional)
+- **Engine:** Stockfish 18 (WebAssembly) running in two workers — one for live play, one for background depth-12 analysis. Weakening pipeline in `src/engine/weakening.ts`; sanity-filtered selector in `selectMove()`.
+- **AI:** `@anthropic-ai/sdk` streaming Messages API (`claude-sonnet-4-6`); browser-direct via `dangerouslyAllowBrowser: true`. The raw key is held in a `useRef` so it never lands in React state or DevTools.
+- **Routing:** React Router v7. `/calibrate` is dev-only.
+- **Charts:** Recharts (eval graph)
+- **Shortcuts:** Custom `useShortcut` hook + `cmdk`-based command palette
+- **Toasts:** `sonner` for blunder/game-saved notifications
+- **Storage:** `localStorage` for game history, opening progress, LLM-explanation cache, and the user's chosen theme. The Anthropic API key is held in memory only.
