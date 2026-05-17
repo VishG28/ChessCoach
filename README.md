@@ -4,10 +4,6 @@ A chess training app for the 300–800 Elo player. Play against a properly-weake
 
 **Live demo:** https://vishg28.github.io/ChessCoach/
 
-## Privacy
-
-**Your data never leaves your browser.** Game history is stored in `localStorage` on this device only. The Anthropic API key you optionally paste is held in memory for the current browser tab — it is never written to disk, `localStorage`, `sessionStorage`, cookies, or any server we control. Close the tab and it's gone. When you trigger an AI explanation, the key is sent only to `api.anthropic.com`.
-
 ## Features
 
 - **Play vs. a properly weakened engine (Elo 300–2000)** — A custom weakening pipeline (`src/engine/weakening.ts`) layers depth limiting, movetime caps, and multipv-based candidate selection on top of Stockfish 18. At Elo 300 the engine plays at depth 1 with multipv 10, picks a random move 60 % of the time, and blunders 25 % of the time. Mate-in-1 and queen-hanging moves are sanity-filtered out (queen blunders are allowed below Elo 500 — that's realistic for a true beginner).
@@ -19,6 +15,65 @@ A chess training app for the 300–800 Elo player. Play against a properly-weake
 - **Opening trainer** — London System (white) and Caro-Kann Defense (black) with mastery tracking and a Random Drill mode.
 - **Dark theme by default**, light theme one click away.
 - **Power-user shortcuts** — `Cmd/Ctrl+K` for the command palette, `?` for the cheatsheet, `Cmd/Ctrl+N` new game, `Cmd/Ctrl+Z` take back, `F` flip board, arrows step through review moves, `` ` `` toggles engine debug overlay.
+
+## Engines
+
+ChessCoach supports two opponent engine modes:
+
+- **Maia (default)** - a neural network trained on millions of human Lichess
+  games at specific rating buckets. Mistakes are the kind a real player at
+  that level would make: misjudging a tactic, missing a counterattack,
+  developing a piece to the wrong square. Five models cover Elo 1100, 1300,
+  1500, 1700, 1900 and are downloaded lazily (~3.5MB each, cached after first
+  load).
+- **Stockfish (calibrated)** - Stockfish 18 with depth, MultiPV, and
+  random-move chance dialed to a target Elo. Always available, no download.
+
+Switch in the left sidebar under "Opponent engine". Stockfish at full strength
+always runs in the background for blunder detection and coaching - Maia is
+only used for opponent move selection.
+
+## Opening Book
+
+For the first 12 plies (or 8 plies for Maia under Elo 1400), the opponent
+plays from the [Lichess opening explorer](https://explorer.lichess.ovh/),
+sampling moves by frequency in that Elo bucket. This gives natural opening
+play without engine artifacts. Book moves show a book badge in the move list.
+
+## Costs
+
+- Maia inference is **free** - runs in your browser, no API calls.
+- Lichess opening explorer is **free**, no rate limit for reasonable use.
+- Only LLM coaching uses the paid Anthropic API. Free play mode works without
+  any API key. With Phase 5 prompt tightening, a 40-move game in Conversational
+  mode costs roughly $0.08-0.12 (down from $0.30-0.50 in earlier versions).
+
+## Privacy
+
+- **Your data never leaves your browser.** Game history is stored in
+  `localStorage` on this device only.
+- Maia models are downloaded once and cached in your browser.
+- Lichess opening explorer requests send only the current FEN - no personal data.
+- No telemetry, no analytics, no tracking.
+- The Anthropic API key lives in memory only for the current browser tab. It is
+  never written to disk, `localStorage`, `sessionStorage`, cookies, or any
+  server we control. Close the tab and it is gone. When you trigger an AI
+  explanation, the key is sent only to `api.anthropic.com`.
+
+## Troubleshooting
+
+**"ByteString" error when saving API key:**
+Your pasted key contains invisible Unicode characters (em-dashes from docs,
+zero-width spaces). The dialog tries to clean these automatically, but if it
+fails: re-copy the key directly from
+[console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys).
+
+## Credits
+
+- Engine: [Stockfish](https://stockfishchess.org/) 18
+- Neural opponent: [Maia](https://github.com/CSSLab/maia-chess) (CSSLab, U of Toronto)
+- Opening data: [Lichess explorer](https://explorer.lichess.ovh)
+- ONNX runtime: [onnxruntime-web](https://onnxruntime.ai/docs/tutorials/web/)
 
 ## Local development
 
