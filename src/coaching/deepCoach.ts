@@ -140,6 +140,11 @@ export async function* streamCoachMessage(
   opts: StreamCoachOptions,
   onUsage: (u: StreamCoachUsage) => void,
 ): AsyncGenerator<string, StreamCoachResult, void> {
+  if (!/^[\x00-\x7F]+$/.test(opts.apiKey)) {
+    throw new Error(
+      'API key contains invalid characters. Re-enter it from console.anthropic.com.',
+    )
+  }
   const client = new Anthropic({
     apiKey: opts.apiKey,
     dangerouslyAllowBrowser: true,
