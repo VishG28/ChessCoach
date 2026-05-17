@@ -2,10 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Chess } from 'chess.js'
 import type { Color, Square } from 'chess.js'
 import { useLocation } from 'react-router-dom'
+import { toast } from 'sonner'
 import { Board } from '@/components/board/Board'
 import { CapturedPieces } from '@/components/board/CapturedPieces'
 import { BoardActionBar } from '@/components/board/BoardActionBar'
 import { CoachPanel } from '@/components/coaching/CoachPanel'
+import { EngineSelector, getDefaultEngine } from '@/components/coaching/EngineSelector'
 import {
   LeftSidebar,
   type CoachMode,
@@ -19,16 +21,14 @@ import { useExplain } from '@/coaching/useExplain'
 import type { BlunderContext } from '@/coaching/llmCoach'
 import { useEngine, parseUciMove } from '@/engine/engine'
 import { useChessGame } from '@/lib/useChessGame'
-import { getWeakeningParams, humanThinkDelay, selectMove } from '@/engine/weakening'
+import { humanThinkDelay } from '@/engine/weakening'
 import { useGameLogger, type OpponentMoveMeta } from '@/games/useGameLogger'
 import { useDeepCoach, uciPvToSan, uciToSan, type LiveCoachMessage } from '@/coaching/useDeepCoach'
 import type { CandidateLine, CoachingStyle, PreMoveContext } from '@/coaching/deepCoach'
 import { useShortcut } from '@/lib/shortcuts'
-import { getBookMove } from '@/engine/openingBook'
-import type { MoveSource } from '@/games/types'
 import type { MoveSourceInfo } from '@/components/sidebar/RightSidebar'
-
-const STOCKFISH_MODEL_ID = 'stockfish-18'
+import { requestOpponentMove, type OpponentMode } from '@/engine/opponentEngine'
+import { loadMaiaModel, maiaModelName, selectMaiaModel } from '@/engine/maia'
 
 /** Convert a UCI move to SAN given a FEN. Returns UCI string unchanged on failure. */
 function uciToSanLocal(fen: string, uci: string): string {
@@ -63,6 +63,16 @@ export function PlayPage() {
   const [coachingStyle, setCoachingStyle] = useState<CoachingStyle>('conversational')
   const [debugOpen, setDebugOpen] = useState(false)
   const [engineThinking, setEngineThinking] = useState(false)
+  const [engineMode, setEngineMode] = useState<OpponentMode>(getDefaultEngine())
+
+  // Lazy-load Maia model when the user picks Maia or changes Elo bucket.
+  useEffect(() => {
+    if (engineMode !== 'maia') return
+    const tid = toast.loading('Loading Maia neural network…')
+    loadMaiaModel(elo)
+      .then(() => toast.success(`Maia ${selectMaiaModel(elo)} ready`, { id: tid }))
+      .catch((e) => toast.error(`Maia load failed: ${String(e)}`, { id: tid }))
+  }, [engineMode, elo])
 
   const userColor: Color = game.orientation === 'white' ? 'w' : 'b'
 
@@ -178,6 +188,8 @@ export function PlayPage() {
     engineElo: elo,
     userColor: userColor === 'w' ? 'white' : 'black',
     coachMode,
+    engine: engineMode,
+    engineModel: engineMode === 'maia' ? maiaModelName(elo) : 'stockfish-18',
     coachMessage: coach.blunderAlert
       ? { ply: game.history.length, text: `Blunder: ${coach.blunderAlert.san} lost ${coach.blunderAlert.loss}cp. Engine prefers ${coach.blunderAlert.better}.` }
       : null,
@@ -284,7 +296,6 @@ export function PlayPage() {
     if (game.turn !== engineColor) return
 
     const requestId = ++engineRequestIdRef.current
-    const params = getWeakeningParams(elo)
     const evalCp = coach.liveEval?.cp
     const fenBefore = game.fen
     // The ply about to be played (history length grows by 1 after makeMove).
@@ -295,48 +306,18 @@ export function PlayPage() {
       try {
         const startedAt = performance.now()
 
-        // 1. Try the Lichess opening book first.
-        let chosenUci: string | null = null
-        let source: MoveSource = 'stockfish'
-        let bookWeight: number | undefined
-        let rollLabel: 'best' | 'random' | 'blunder' | 'filtered' = 'best'
-        let cpBest = 0
-
-        const book = await getBookMove(fenBefore, elo, ply)
+        // Unified opponent move pipeline: book → maia (with Stockfish fallback) → Stockfish.
+        const result = await requestOpponentMove({
+          engine,
+          fen: fenBefore,
+          ply,
+          elo,
+          mode: engineMode,
+          liveEvalCp: evalCp,
+        })
         if (engineRequestIdRef.current !== requestId) return
-        if (book) {
-          chosenUci = book.uci
-          source = 'book'
-          bookWeight = book.weight
-        } else {
-          // 2. Fall back to the Stockfish weakening pipeline.
-          const move = await engine.requestMove({
-            fen: fenBefore,
-            depth: params.depth,
-            movetime: params.movetime,
-            multipv: params.multipv,
-          })
-          if (engineRequestIdRef.current !== requestId) return
 
-          const fallbackUci = `${move.from}${move.to}${move.promotion ?? ''}`
-          const candidates =
-            move.topCandidates && move.topCandidates.length > 0
-              ? move.topCandidates
-              : [{ move: fallbackUci, cp: 0, pv: [] }]
-
-          const result = selectMove({
-            candidates,
-            randomMoveChance: params.randomMoveChance,
-            blunderChance: params.blunderChance,
-            fenBefore,
-            eloForSanity: elo,
-            evalCp,
-          })
-          chosenUci = result.uci
-          rollLabel = result.roll
-          cpBest = result.cpBest
-        }
-
+        const chosenUci = result.uci
         if (!chosenUci) return
 
         // Wait for human-feel think time, measured from request start.
@@ -346,19 +327,23 @@ export function PlayPage() {
         if (engineRequestIdRef.current !== requestId) return
 
         // Record provenance for the debug overlay and the logger.
-        engine.recordOpponentSource(source)
+        // result.source is always 'book' | 'stockfish' | 'maia' for opponent
+        // moves (never 'user'), but the type union includes 'user'; narrow it.
+        if (result.source !== 'user') {
+          engine.recordOpponentSource(result.source)
+        }
         lastOpponentMetaRef.current = {
-          source,
-          engineModel: STOCKFISH_MODEL_ID,
-          ...(bookWeight !== undefined ? { bookWeight } : {}),
+          source: result.source,
+          engineModel: result.engineModel,
+          ...(result.bookWeight !== undefined ? { bookWeight: result.bookWeight } : {}),
         }
         // Snapshot for the move-list badge (history index is ply - 1).
         const historyIndex = ply - 1
         setMoveSources((prev) => {
           const next = new Map(prev)
           next.set(historyIndex, {
-            source,
-            ...(bookWeight !== undefined ? { bookWeight } : {}),
+            source: result.source,
+            ...(result.bookWeight !== undefined ? { bookWeight: result.bookWeight } : {}),
           })
           return next
         })
@@ -371,9 +356,16 @@ export function PlayPage() {
         })
 
         const lastEntry = game.history[game.history.length - 1]
-        if (lastEntry && engine && source === 'stockfish') {
+        if (lastEntry && engine && result.source === 'stockfish') {
           engine.recordEngineMoveSan(chosenUci, lastEntry.san)
-          engine.recordRoll(chosenUci, rollLabel, cpBest)
+          if (result.rollMeta) {
+            const cpBest = result.rollMeta.cpBest ?? 0
+            engine.recordRoll(
+              chosenUci,
+              result.rollMeta.roll as 'best' | 'random' | 'blunder' | 'filtered',
+              cpBest,
+            )
+          }
         }
       } catch {
         // Engine disposed mid-request, or transport error. Silent fail —
@@ -386,7 +378,7 @@ export function PlayPage() {
     // including it would loop. The fields we read (fen/turn/isGameOver) are
     // in deps; makeMove is stable in behavior even though its identity isn't.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [engine, ready, game.fen, game.turn, game.isGameOver, userColor, elo])
+  }, [engine, ready, game.fen, game.turn, game.isGameOver, userColor, elo, engineMode])
 
   const handleUserMove = (
     from: string,
@@ -495,6 +487,9 @@ export function PlayPage() {
           coachingStyle={coachingStyle}
           onCoachingStyleChange={setCoachingStyle}
         />
+        <div className="rounded-lg border bg-card p-4">
+          <EngineSelector value={engineMode} onChange={setEngineMode} disabled={false} />
+        </div>
       </aside>
 
       <main className="flex flex-col items-center gap-4">

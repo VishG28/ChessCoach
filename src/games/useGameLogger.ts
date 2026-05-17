@@ -24,6 +24,10 @@ export interface GameLoggerInput {
   engineElo: number
   userColor: 'white' | 'black'
   coachMode: 'off' | 'warnings' | 'full'
+  /** Engine family used to generate opponent moves. */
+  engine?: 'stockfish' | 'maia'
+  /** Specific model identifier (e.g. 'stockfish-18', 'maia-1300'). */
+  engineModel?: string
   /** Last coach message keyed by ply. */
   coachMessage?: { ply: number; text: string } | null
   /**
@@ -49,7 +53,16 @@ function mapGameResult(game: UseChessGameResult): GameResult {
 }
 
 export function useGameLogger(input: GameLoggerInput): GameLoggerOutput {
-  const { game, engineElo, userColor, coachMode, coachMessage, lastOpponentMetaRef } = input
+  const {
+    game,
+    engineElo,
+    userColor,
+    coachMode,
+    engine,
+    engineModel,
+    coachMessage,
+    lastOpponentMetaRef,
+  } = input
 
   const currentGameIdRef = useRef<string | null>(null)
   const prevHistoryLengthRef = useRef(0)
@@ -71,7 +84,13 @@ export function useGameLogger(input: GameLoggerInput): GameLoggerOutput {
     if (currentLen > prevLen) {
       // Lazy-create game on first move
       if (currentGameIdRef.current === null) {
-        const newGame = startNewGame({ userColor, engineElo, coachMode })
+        const newGame = startNewGame({
+          userColor,
+          engineElo,
+          coachMode,
+          ...(engine ? { engine } : {}),
+          ...(engineModel ? { engineModel } : {}),
+        })
         currentGameIdRef.current = newGame.id
       }
 

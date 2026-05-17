@@ -68,6 +68,8 @@ interface NewGameInit {
   userColor: 'white' | 'black'
   engineElo: number
   coachMode: 'off' | 'warnings' | 'full'
+  engine?: 'stockfish' | 'maia'
+  engineModel?: string
 }
 
 export function startNewGame(init: NewGameInit): Game {
@@ -80,6 +82,8 @@ export function startNewGame(init: NewGameInit): Game {
     coachMode: init.coachMode,
     pgn: '',
     moves: [],
+    ...(init.engine ? { engine: init.engine } : {}),
+    ...(init.engineModel ? { engineModel: init.engineModel } : {}),
   }
   writeAll([game, ...readAll()])
   return game
