@@ -1,25 +1,25 @@
 import { useEffect, useRef, useState } from 'react'
-import type { EngineEval, EngineMove } from './types'
+import type { EngineDebugState, EngineEval, EngineMove, TopCandidate } from './types'
+import {
+  UCI_ELO_FLOOR,
+  depthFromElo,
+  movetimeFromElo,
+  randomnessFromElo,
+  skillFromElo,
+  useMultiPV,
+} from './eloCurves'
 
 const WORKER_URL = '/engine/stockfish-18-lite-single.js'
-const ELO_MIN_UCI = 1320
 const ELO_MAX_UCI = 3190
-const ELO_SLIDER_MIN = 300
-const ELO_SLIDER_MAX = 1319
-const SKILL_MAX = 20
 const MATE_SCORE = 100000
+const RECENT_MOVES_MAX = 5
+const LAST_COMMANDS_MAX = 20
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value))
 }
 
-function skillFromElo(elo: number): number {
-  const span = ELO_SLIDER_MAX - ELO_SLIDER_MIN
-  const ratio = (elo - ELO_SLIDER_MIN) / span
-  return clamp(Math.round(ratio * SKILL_MAX), 0, SKILL_MAX)
-}
-
-function parseUciMove(uci: string): EngineMove {
+export function parseUciMove(uci: string): EngineMove {
   const promo = uci.length >= 5 ? uci[4] : undefined
   const move: EngineMove = { from: uci.slice(0, 2), to: uci.slice(2, 4) }
   if (promo === 'q' || promo === 'r' || promo === 'b' || promo === 'n') {
@@ -33,6 +33,7 @@ interface InfoSnapshot {
   cp: number
   mateIn?: number
   pv: string[]
+  multipv: number
 }
 
 type JobMode = 'ready' | 'move' | 'eval'
@@ -44,13 +45,34 @@ interface Job {
   reject: (e: Error) => void
 }
 
+export interface RequestMoveOptions {
+  fen: string
+  depth: number
+  movetime: number
+  multipv?: number
+}
+
 export class Engine {
   private worker: Worker
   private initPromise: Promise<void> | null = null
   private queue: Job[] = []
   private active: Job | null = null
-  private info: InfoSnapshot = { depth: 0, cp: 0, pv: [] }
+  private info: InfoSnapshot = { depth: 0, cp: 0, pv: [], multipv: 1 }
   private disposed = false
+
+  private debugState: EngineDebugState = {
+    elo: 0,
+    skill: 0,
+    depth: 0,
+    movetime: 0,
+    multipv: 1,
+    randomness: 0,
+    lastCommands: [],
+    recentMoves: [],
+  }
+  private debugListeners = new Set<(s: EngineDebugState) => void>()
+  private currentMultipv = 1
+  private candidates: Map<number, TopCandidate> = new Map()
 
   constructor() {
     this.worker = new Worker(WORKER_URL)
@@ -61,6 +83,35 @@ export class Engine {
         if (trimmed.length > 0) this.handleLine(trimmed)
       }
     }
+  }
+
+  getDebugState(): EngineDebugState {
+    return {
+      ...this.debugState,
+      lastCommands: [...this.debugState.lastCommands],
+      recentMoves: this.debugState.recentMoves.map((m) => ({ ...m })),
+    }
+  }
+
+  onDebug(fn: (s: EngineDebugState) => void): () => void {
+    this.debugListeners.add(fn)
+    return () => {
+      this.debugListeners.delete(fn)
+    }
+  }
+
+  recordEngineMoveSan(uci: string, san: string): void {
+    // Patch the most recent recentMoves entry whose uci matches and san is not yet set
+    const moves = this.debugState.recentMoves.map((m) =>
+      m.uci === uci && m.san === undefined ? { ...m, san } : m,
+    )
+    this.updateDebug({ recentMoves: moves })
+  }
+
+  private updateDebug(patch: Partial<EngineDebugState>): void {
+    this.debugState = { ...this.debugState, ...patch }
+    const snapshot = this.getDebugState()
+    for (const fn of this.debugListeners) fn(snapshot)
   }
 
   init(): Promise<void> {
@@ -74,22 +125,56 @@ export class Engine {
   }
 
   setStrength(elo: number): Promise<void> {
-    const commands =
-      elo >= ELO_MIN_UCI
-        ? [
-            'setoption name UCI_LimitStrength value true',
-            `setoption name UCI_Elo value ${clamp(Math.round(elo), ELO_MIN_UCI, ELO_MAX_UCI)}`,
-          ]
-        : [
-            'setoption name UCI_LimitStrength value false',
-            `setoption name Skill Level value ${skillFromElo(elo)}`,
-          ]
-    return this.enqueue('ready', [...commands, 'isready']) as Promise<void>
+    const skill = skillFromElo(elo)
+    const depth = depthFromElo(elo)
+    const movetime = movetimeFromElo(elo)
+    const randomness = randomnessFromElo(elo)
+    const multipv = useMultiPV(elo) ? 5 : 1
+    const limit = elo >= UCI_ELO_FLOOR
+
+    const cmds: string[] = [
+      `setoption name MultiPV value ${multipv}`,
+      `setoption name Skill Level value ${skill}`,
+      `setoption name UCI_LimitStrength value ${limit}`,
+    ]
+    if (limit) {
+      cmds.push(`setoption name UCI_Elo value ${clamp(Math.round(elo), UCI_ELO_FLOOR, ELO_MAX_UCI)}`)
+    }
+    cmds.push('isready')
+
+    this.currentMultipv = multipv
+
+    const updatedCommands = [...this.debugState.lastCommands, ...cmds].slice(-LAST_COMMANDS_MAX)
+    this.updateDebug({
+      elo,
+      skill,
+      depth,
+      movetime,
+      multipv,
+      randomness,
+      lastCommands: updatedCommands,
+    })
+
+    if (import.meta.env.DEV) {
+      console.info('[engine] setStrength', { elo, skill, depth, movetime, multipv, limit })
+    }
+
+    return this.enqueue('ready', cmds) as Promise<void>
   }
 
-  requestMove(fen: string, movetimeMs: number): Promise<EngineMove> {
-    const ms = Math.max(1, Math.round(movetimeMs))
-    return this.enqueue('move', [`position fen ${fen}`, `go movetime ${ms}`]) as Promise<EngineMove>
+  requestMove(opts: RequestMoveOptions): Promise<EngineMove> {
+    const { fen, depth, movetime, multipv = 1 } = opts
+    this.currentMultipv = multipv
+    this.candidates.clear()
+
+    const d = Math.max(1, Math.round(depth))
+    const t = Math.max(50, Math.round(movetime))
+
+    const moveCmds = [`position fen ${fen}`, `go depth ${d} movetime ${t}`]
+    const updatedCommands = [...this.debugState.lastCommands, ...moveCmds].slice(-LAST_COMMANDS_MAX)
+    this.updateDebug({ lastCommands: updatedCommands })
+
+    return this.enqueue('move', moveCmds) as Promise<EngineMove>
   }
 
   requestEval(fen: string, depth: number): Promise<EngineEval> {
@@ -120,7 +205,7 @@ export class Engine {
     this.active = this.queue.shift() ?? null
     if (!this.active) return
     if (this.active.mode !== 'ready') {
-      this.info = { depth: 0, cp: 0, pv: [] }
+      this.info = { depth: 0, cp: 0, pv: [], multipv: 1 }
     }
     for (const cmd of this.active.commands) this.worker.postMessage(cmd)
   }
@@ -145,7 +230,25 @@ export class Engine {
       return
     }
     if (this.active.mode === 'move') {
-      this.finishActive(parseUciMove(best))
+      const engineMove = parseUciMove(best)
+
+      if (this.currentMultipv > 1 && this.candidates.size > 0) {
+        // Build topCandidates sorted by multipv index ascending (best first)
+        const sorted = Array.from(this.candidates.entries())
+          .sort(([a], [b]) => a - b)
+          .map(([, cand]) => cand)
+        engineMove.topCandidates = sorted
+      }
+
+      // Record move in debug ring buffer
+      const cp = this.candidates.get(1)?.cp ?? this.info.cp
+      const recentMoves = [
+        ...this.debugState.recentMoves,
+        { uci: best, cp },
+      ].slice(-RECENT_MOVES_MAX)
+      this.updateDebug({ recentMoves })
+
+      this.finishActive(engineMove)
     } else {
       const result: EngineEval = {
         cp: this.info.cp,
@@ -168,13 +271,24 @@ export class Engine {
 
   private updateInfo(line: string): void {
     const tokens = line.split(/\s+/)
-    const next: InfoSnapshot = { ...this.info, pv: this.info.pv }
+    const next: InfoSnapshot = { ...this.info, pv: [...this.info.pv] }
     let i = 1
+    let hasDepth = false
+    let hasScore = false
+    let hasPv = false
+
     while (i < tokens.length) {
       const t = tokens[i]
       if (t === 'depth' && i + 1 < tokens.length) {
         const d = Number(tokens[i + 1])
-        if (Number.isFinite(d)) next.depth = d
+        if (Number.isFinite(d)) {
+          next.depth = d
+          hasDepth = true
+        }
+        i += 2
+      } else if (t === 'multipv' && i + 1 < tokens.length) {
+        const m = Number(tokens[i + 1])
+        if (Number.isFinite(m)) next.multipv = m
         i += 2
       } else if (t === 'score' && i + 2 < tokens.length) {
         const val = Number(tokens[i + 2])
@@ -182,20 +296,33 @@ export class Engine {
           if (tokens[i + 1] === 'cp') {
             next.cp = val
             next.mateIn = undefined
+            hasScore = true
           } else if (tokens[i + 1] === 'mate') {
             next.mateIn = val
             next.cp = val > 0 ? MATE_SCORE - val : -MATE_SCORE - val
+            hasScore = true
           }
         }
         i += 3
       } else if (t === 'pv') {
         next.pv = tokens.slice(i + 1)
+        hasPv = true
         break
       } else {
         i += 1
       }
     }
+
     this.info = next
+
+    // When MultiPV > 1, record the candidate for this multipv index
+    if (this.currentMultipv > 1 && hasDepth && hasScore && hasPv && next.pv.length > 0) {
+      this.candidates.set(next.multipv, {
+        move: next.pv[0],
+        cp: next.cp,
+        pv: next.pv,
+      })
+    }
   }
 }
 

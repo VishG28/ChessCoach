@@ -1,9 +1,30 @@
 export type Square = string // 'a1'..'h8'; engine returns UCI strings
 
+export interface TopCandidate {
+  move: string // UCI move string, e.g. 'e2e4'
+  cp: number
+  pv: string[]
+}
+
 export interface EngineMove {
   from: Square
   to: Square
   promotion?: 'q' | 'r' | 'b' | 'n'
+  /** Present when MultiPV > 1 was requested. Sorted by multipv index (best first). */
+  topCandidates?: TopCandidate[]
+}
+
+export interface EngineDebugState {
+  elo: number
+  skill: number
+  depth: number
+  movetime: number
+  multipv: number
+  randomness: number
+  /** Most recent UCI commands sent, oldest first (ring buffer, max 20). */
+  lastCommands: string[]
+  /** Last 5 engine moves played, oldest first. */
+  recentMoves: Array<{ san?: string; uci: string; cp: number }>
 }
 
 export interface EngineEval {

@@ -8,22 +8,35 @@ import {
   type UserColor,
 } from '@/components/sidebar/LeftSidebar'
 import { RightSidebar } from '@/components/sidebar/RightSidebar'
+import { DebugOverlay } from '@/components/debug/DebugOverlay'
 import { useCoach } from '@/coaching/useCoach'
-import { useEngine } from '@/engine/engine'
+import { useEngine, parseUciMove } from '@/engine/engine'
 import { useChessGame } from '@/lib/useChessGame'
+import {
+  depthFromElo,
+  movetimeFromElo,
+  randomnessFromElo,
+  useMultiPV,
+} from '@/engine/eloCurves'
+import type { TopCandidate } from '@/engine/types'
 
 const DEFAULT_ELO = 800
 const DEFAULT_COACH_MODE: CoachMode = 'warnings'
 const DEFAULT_USER_COLOR: UserColor = 'white'
 
-function movetimeFromElo(elo: number): number {
-  const t = Math.max(0, Math.min(1, (elo - 300) / (2000 - 300)))
-  return Math.round(120 + t * 1100)
-}
-
 function resolveUserColor(choice: UserColor): 'white' | 'black' {
   if (choice === 'random') return Math.random() < 0.5 ? 'white' : 'black'
   return choice
+}
+
+function weightedPick<T>(items: T[], weights: number[]): T {
+  const total = weights.slice(0, items.length).reduce((a, b) => a + b, 0)
+  let r = Math.random() * total
+  for (let i = 0; i < items.length; i++) {
+    r -= weights[i] ?? 0
+    if (r <= 0) return items[i]
+  }
+  return items[items.length - 1]
 }
 
 function App() {
@@ -33,8 +46,27 @@ function App() {
   const [elo, setElo] = useState(DEFAULT_ELO)
   const [colorChoice, setColorChoice] = useState<UserColor>(DEFAULT_USER_COLOR)
   const [coachMode, setCoachMode] = useState<CoachMode>(DEFAULT_COACH_MODE)
+  const [debugOpen, setDebugOpen] = useState(false)
 
   const userColor: Color = game.orientation === 'white' ? 'w' : 'b'
+
+  // Backtick key toggles debug overlay (ignored when typing in inputs)
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key !== '`') return
+      const target = e.target as HTMLElement | null
+      if (
+        target?.tagName === 'INPUT' ||
+        target?.tagName === 'TEXTAREA' ||
+        target?.isContentEditable
+      ) {
+        return
+      }
+      setDebugOpen((v) => !v)
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
 
   // Push strength to the engine whenever it changes (and once on ready).
   useEffect(() => {
@@ -62,17 +94,49 @@ function App() {
     if (game.turn !== engineColor) return
 
     const requestId = ++engineRequestIdRef.current
+    const depth = depthFromElo(elo)
     const movetime = movetimeFromElo(elo)
+    const multipvEnabled = useMultiPV(elo)
+    const multipv = multipvEnabled ? 5 : 1
+    const randomness = randomnessFromElo(elo)
 
     void (async () => {
       try {
-        const move = await engine.requestMove(game.fen, movetime)
-        if (engineRequestIdRef.current !== requestId) return
-        game.makeMove({
-          from: move.from as Square,
-          to: move.to as Square,
-          promotion: move.promotion,
+        const move = await engine.requestMove({
+          fen: game.fen,
+          depth,
+          movetime,
+          multipv,
         })
+        if (engineRequestIdRef.current !== requestId) return
+
+        let chosen = move
+
+        // Apply weighted-random candidate selection at low Elo
+        if (
+          multipvEnabled &&
+          move.topCandidates &&
+          move.topCandidates.length > 1 &&
+          Math.random() < randomness
+        ) {
+          const cands = move.topCandidates.slice(0, 5) as TopCandidate[]
+          const weights = [5, 4, 3, 2, 1].slice(0, cands.length)
+          const pick = weightedPick(cands, weights)
+          chosen = parseUciMove(pick.move)
+        }
+
+        game.makeMove({
+          from: chosen.from as Square,
+          to: chosen.to as Square,
+          promotion: chosen.promotion,
+        })
+
+        // Record SAN for the debug overlay after the move is applied
+        const lastEntry = game.history[game.history.length - 1]
+        const uciStr = `${chosen.from}${chosen.to}${chosen.promotion ?? ''}`
+        if (lastEntry && engine) {
+          engine.recordEngineMoveSan(uciStr, lastEntry.san)
+        }
       } catch {
         // Engine disposed mid-request, or transport error. Silent fail —
         // the position will retry on the next render cycle.
@@ -181,6 +245,8 @@ function App() {
           />
         </aside>
       </div>
+
+      {debugOpen && engine && <DebugOverlay engine={engine} elo={elo} />}
     </div>
   )
 }
