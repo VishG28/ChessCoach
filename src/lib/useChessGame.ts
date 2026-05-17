@@ -21,10 +21,12 @@ export interface UseChessGameResult {
   isGameOver: boolean
   gameResult: 'white' | 'black' | 'draw' | null
   orientation: Color
+  pgn: string
   makeMove: (move: MoveInput) => Move | null
   undo: (plies?: number) => void
   reset: () => void
   loadPgn: (pgn: string) => boolean
+  loadFen: (fen: string) => boolean
   setOrientation: (color: Color) => void
 }
 
@@ -125,6 +127,17 @@ export function useChessGame(): UseChessGameResult {
     }
   }
 
+  const loadFen = (fen: string): boolean => {
+    try {
+      chessRef.current.load(fen)
+      persist()
+      bump()
+      return true
+    } catch {
+      return false
+    }
+  }
+
   const setOrientation = (color: Color): void => {
     setOrientationState(color)
     persist(color)
@@ -145,6 +158,7 @@ export function useChessGame(): UseChessGameResult {
       inCheck: chess.isCheck(),
       isGameOver: chess.isGameOver(),
       gameResult: computeResult(chess),
+      pgn: chess.pgn(),
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [version])
@@ -156,6 +170,7 @@ export function useChessGame(): UseChessGameResult {
     undo,
     reset,
     loadPgn,
+    loadFen,
     setOrientation,
   }
 }

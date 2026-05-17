@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Color, Square } from 'chess.js'
+import { useLocation } from 'react-router-dom'
 import { Board } from '@/components/board/Board'
 import { CoachPanel } from '@/components/coaching/CoachPanel'
 import {
@@ -19,6 +20,7 @@ import {
   useMultiPV,
 } from '@/engine/eloCurves'
 import type { TopCandidate } from '@/engine/types'
+import { useGameLogger } from '@/games/useGameLogger'
 
 const DEFAULT_ELO = 800
 const DEFAULT_COACH_MODE: CoachMode = 'warnings'
@@ -42,6 +44,7 @@ function weightedPick<T>(items: T[], weights: number[]): T {
 export function PlayPage() {
   const game = useChessGame()
   const { engine, ready } = useEngine()
+  const location = useLocation()
 
   const [elo, setElo] = useState(DEFAULT_ELO)
   const [colorChoice, setColorChoice] = useState<UserColor>(DEFAULT_USER_COLOR)
@@ -49,6 +52,25 @@ export function PlayPage() {
   const [debugOpen, setDebugOpen] = useState(false)
 
   const userColor: Color = game.orientation === 'white' ? 'w' : 'b'
+
+  // Handle "Play from here" redirects from GameReviewPage
+  const fromFenAppliedRef = useRef(false)
+  useEffect(() => {
+    if (fromFenAppliedRef.current) return
+    const params = new URLSearchParams(location.search)
+    const fromFen = params.get('from')
+    const engineColorParam = params.get('engineColor')
+    if (!fromFen) return
+    fromFenAppliedRef.current = true
+    game.loadFen(fromFen)
+    if (engineColorParam === 'w') {
+      // Engine is white => user plays black
+      game.setOrientation('black')
+    } else if (engineColorParam === 'b') {
+      // Engine is black => user plays white
+      game.setOrientation('white')
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Backtick key toggles debug overlay (ignored when typing in inputs)
   useEffect(() => {
@@ -82,6 +104,17 @@ export function PlayPage() {
     mode: coachMode,
     userColor,
     evalDepth: 10,
+  })
+
+  // Log every move to persistent game storage with background analysis
+  useGameLogger({
+    game,
+    engineElo: elo,
+    userColor: userColor === 'w' ? 'white' : 'black',
+    coachMode,
+    coachMessage: coach.blunderAlert
+      ? { ply: game.history.length, text: `Blunder: ${coach.blunderAlert.san} lost ${coach.blunderAlert.loss}cp. Engine prefers ${coach.blunderAlert.better}.` }
+      : null,
   })
 
   // Engine plays the opposite color. Use a request-id ref to discard stale

@@ -15,6 +15,16 @@ const MATE_SCORE = 100000
 const RECENT_MOVES_MAX = 5
 const LAST_COMMANDS_MAX = 20
 
+export interface EngineOptions {
+  /** A label for logs / debug. Defaults to 'play'. */
+  instanceName?: string
+}
+
+export interface AnalysisResult {
+  eval: EngineEval
+  candidates: TopCandidate[]
+}
+
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value))
 }
@@ -36,12 +46,12 @@ interface InfoSnapshot {
   multipv: number
 }
 
-type JobMode = 'ready' | 'move' | 'eval'
+type JobMode = 'ready' | 'move' | 'eval' | 'analyze'
 
 interface Job {
   mode: JobMode
   commands: string[]
-  resolve: (value: EngineMove | EngineEval | void) => void
+  resolve: (value: EngineMove | EngineEval | AnalysisResult | void) => void
   reject: (e: Error) => void
 }
 
@@ -54,6 +64,7 @@ export interface RequestMoveOptions {
 
 export class Engine {
   private worker: Worker
+  private readonly name: string
   private initPromise: Promise<void> | null = null
   private queue: Job[] = []
   private active: Job | null = null
@@ -74,7 +85,8 @@ export class Engine {
   private currentMultipv = 1
   private candidates: Map<number, TopCandidate> = new Map()
 
-  constructor() {
+  constructor(opts: EngineOptions = {}) {
+    this.name = opts.instanceName ?? 'play'
     this.worker = new Worker(WORKER_URL)
     this.worker.onmessage = (event: MessageEvent<unknown>) => {
       if (typeof event.data !== 'string') return
@@ -82,6 +94,9 @@ export class Engine {
         const trimmed = line.trim()
         if (trimmed.length > 0) this.handleLine(trimmed)
       }
+    }
+    if (import.meta.env.DEV) {
+      console.info('[engine:' + this.name + '] created')
     }
   }
 
@@ -182,6 +197,31 @@ export class Engine {
     return this.enqueue('eval', [`position fen ${fen}`, `go depth ${d}`]) as Promise<EngineEval>
   }
 
+  setMultiPV(n: number): Promise<void> {
+    const cmds = [`setoption name MultiPV value ${n}`, 'isready']
+    this.currentMultipv = n
+    if (import.meta.env.DEV) {
+      console.info('[engine:' + this.name + '] setMultiPV', n)
+    }
+    return this.enqueue('ready', cmds) as Promise<void>
+  }
+
+  requestAnalysis(opts: { fen: string; depth: number; multipv: number }): Promise<AnalysisResult> {
+    const { fen, depth, multipv } = opts
+    this.currentMultipv = multipv
+    this.candidates.clear()
+    const d = Math.max(1, Math.round(depth))
+    const cmds = [
+      `setoption name MultiPV value ${multipv}`,
+      `position fen ${fen}`,
+      `go depth ${d}`,
+    ]
+    if (import.meta.env.DEV) {
+      console.info('[engine:' + this.name + '] requestAnalysis', { fen, depth, multipv })
+    }
+    return this.enqueue('analyze', cmds) as Promise<AnalysisResult>
+  }
+
   dispose(): void {
     if (this.disposed) return
     this.disposed = true
@@ -193,8 +233,8 @@ export class Engine {
     this.worker.terminate()
   }
 
-  private enqueue(mode: JobMode, commands: string[]): Promise<EngineMove | EngineEval | void> {
-    return new Promise<EngineMove | EngineEval | void>((resolve, reject) => {
+  private enqueue(mode: JobMode, commands: string[]): Promise<EngineMove | EngineEval | AnalysisResult | void> {
+    return new Promise<EngineMove | EngineEval | AnalysisResult | void>((resolve, reject) => {
       this.queue.push({ mode, commands, resolve, reject })
       this.drain()
     })
@@ -206,6 +246,9 @@ export class Engine {
     if (!this.active) return
     if (this.active.mode !== 'ready') {
       this.info = { depth: 0, cp: 0, pv: [], multipv: 1 }
+      if (this.active.mode === 'move' || this.active.mode === 'analyze') {
+        this.candidates.clear()
+      }
     }
     for (const cmd of this.active.commands) this.worker.postMessage(cmd)
   }
@@ -249,6 +292,22 @@ export class Engine {
       this.updateDebug({ recentMoves })
 
       this.finishActive(engineMove)
+    } else if (this.active.mode === 'analyze') {
+      const topEval: EngineEval = {
+        cp: this.candidates.get(1)?.cp ?? this.info.cp,
+        bestMove: best,
+        pv: this.candidates.get(1)?.pv ?? this.info.pv,
+        depth: this.info.depth,
+        ...(this.info.mateIn !== undefined ? { mateIn: this.info.mateIn } : {}),
+      }
+      const sorted = Array.from(this.candidates.entries())
+        .sort(([a], [b]) => a - b)
+        .map(([, cand]) => cand)
+      const result: AnalysisResult = {
+        eval: topEval,
+        candidates: sorted,
+      }
+      this.finishActive(result)
     } else {
       const result: EngineEval = {
         cp: this.info.cp,
@@ -261,7 +320,7 @@ export class Engine {
     }
   }
 
-  private finishActive(value: EngineMove | EngineEval | undefined): void {
+  private finishActive(value: EngineMove | EngineEval | AnalysisResult | undefined): void {
     if (!this.active) return
     const job = this.active
     this.active = null
@@ -315,8 +374,9 @@ export class Engine {
 
     this.info = next
 
-    // When MultiPV > 1, record the candidate for this multipv index
-    if (this.currentMultipv > 1 && hasDepth && hasScore && hasPv && next.pv.length > 0) {
+    // When MultiPV > 1 (or analyze mode), record the candidate for this multipv index
+    const isAnalyzeMode = this.active?.mode === 'analyze'
+    if ((this.currentMultipv > 1 || isAnalyzeMode) && hasDepth && hasScore && hasPv && next.pv.length > 0) {
       this.candidates.set(next.multipv, {
         move: next.pv[0],
         cp: next.cp,
@@ -333,7 +393,7 @@ export function useEngine(): { engine: Engine | null; ready: boolean } {
 
   useEffect(() => {
     let cancelled = false
-    const instance = new Engine()
+    const instance = new Engine({ instanceName: 'play' })
     engineRef.current = instance
     setEngine(instance)
     instance
