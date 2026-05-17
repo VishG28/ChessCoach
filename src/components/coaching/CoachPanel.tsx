@@ -17,6 +17,7 @@ import { Separator } from '@/components/ui/separator'
 import { cn } from '@/lib/utils'
 import { ExplainBox } from './ExplainBox'
 import { CoachMessage } from './CoachMessage'
+import { TellMoreButton } from './TellMoreButton'
 
 export interface CoachPanelProps {
   mode: 'off' | 'warnings' | 'full'
@@ -32,7 +33,18 @@ export interface CoachPanelProps {
   explain?: UseExplainResult
   /** Deep coach messages to render above legacy sections. */
   messages?: LiveCoachMessage[]
+  /**
+   * Legacy Tell-Me-More callback used when the parent owns a custom follow-up
+   * prompt (e.g., PlayPage's `followUp` flow). When `requestDeepDive` is also
+   * provided, `requestDeepDive` wins.
+   */
   onTellMore?: (id: string) => void
+  /**
+   * Preferred Tell-Me-More handler from `useDeepCoach`. When supplied, the
+   * panel renders a `TellMoreButton` under each completed brief message and
+   * invokes this callback with the source message's id.
+   */
+  requestDeepDive?: (id: string) => void
   onQuieter?: () => void
 }
 
@@ -75,10 +87,18 @@ export function CoachPanel({
   explain,
   messages,
   onTellMore,
+  requestDeepDive,
   onQuieter,
 }: CoachPanelProps) {
   const isOff = mode === 'off'
   const hasMessages = messages && messages.length > 0
+
+  // Prefer the new deep-dive handler; fall back to the legacy followUp callback.
+  const tellMoreHandler = requestDeepDive ?? onTellMore
+  // Quieter wiring is currently unused at the panel level (lives in PlayPage's
+  // mode toggle). Keep the prop accepted for back-compat but reference it so
+  // the type-checker treats it as intentionally consumed.
+  void onQuieter
 
   return (
     <Card className="w-[560px]">
@@ -122,14 +142,18 @@ export function CoachPanel({
         {/* Deep coach messages rendered above legacy sections */}
         {hasMessages && (
           <div className="space-y-3">
-            {messages!.map((msg) => (
-              <CoachMessage
-                key={msg.id}
-                message={msg}
-                onTellMore={() => onTellMore?.(msg.id)}
-                onQuieter={() => onQuieter?.()}
-              />
-            ))}
+            {messages!.map((msg) => {
+              const isBrief = msg.trigger !== 'tell_me_more'
+              const showTellMore = isBrief && !msg.streaming && !!tellMoreHandler
+              return (
+                <div key={msg.id} className="space-y-1">
+                  <CoachMessage message={msg} />
+                  {showTellMore && (
+                    <TellMoreButton onClick={() => tellMoreHandler?.(msg.id)} />
+                  )}
+                </div>
+              )
+            })}
             <Separator />
           </div>
         )}
