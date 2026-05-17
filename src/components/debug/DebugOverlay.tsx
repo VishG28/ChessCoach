@@ -30,15 +30,36 @@ export function DebugOverlay({ engine, elo }: DebugOverlayProps) {
       {state.recentMoves.length === 0 ? (
         <div className="text-zinc-400">(none yet)</div>
       ) : (
-        state.recentMoves.map((m, i) => (
-          <div key={i}>
-            {m.san ?? m.uci}{' '}
-            <span className="text-zinc-400">
-              ({m.cp >= 0 ? '+' : ''}
-              {(m.cp / 100).toFixed(2)})
-            </span>
-          </div>
-        ))
+        state.recentMoves.map((m, i) => {
+          const cpStr = `${m.cp >= 0 ? '+' : ''}${(m.cp / 100).toFixed(2)}`
+          const bestStr =
+            m.cpBest !== undefined && m.cpBest !== m.cp
+              ? ` (best ${m.cpBest >= 0 ? '+' : ''}${(m.cpBest / 100).toFixed(2)})`
+              : ''
+          const tag = m.roll ?? '—'
+          const tagClass =
+            tag === 'random'
+              ? 'text-amber-300'
+              : tag === 'blunder'
+                ? 'text-red-400'
+                : tag === 'filtered'
+                  ? 'text-sky-300'
+                  : tag === 'best'
+                    ? 'text-emerald-300'
+                    : 'text-zinc-400'
+          return (
+            <div key={i} className="flex justify-between gap-2">
+              <span>
+                {m.san ?? m.uci}{' '}
+                <span className="text-zinc-400">
+                  {cpStr}
+                  {bestStr}
+                </span>
+              </span>
+              <span className={tagClass}>{tag}</span>
+            </div>
+          )
+        })
       )}
       <Separator className="my-2 bg-zinc-700" />
       <div className="font-semibold mb-1">Recent UCI commands</div>
