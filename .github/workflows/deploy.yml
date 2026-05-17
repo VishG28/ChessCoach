@@ -21,7 +21,10 @@ jobs:
         with:
           node-version: 20
           cache: npm
-      - run: npm ci
+      # Use `npm ci` for strict reproducibility; fall back to `npm install` if
+      # the lockfile is missing platform-specific optional deps (which can drift
+      # silently when new packages are added on a different OS).
+      - run: npm ci --include=optional || npm install --include=optional
       - run: npm run build
       - uses: peaceiris/actions-gh-pages@v3
         with:
