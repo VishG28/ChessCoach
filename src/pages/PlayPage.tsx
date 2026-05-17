@@ -39,7 +39,7 @@ function weightedPick<T>(items: T[], weights: number[]): T {
   return items[items.length - 1]
 }
 
-function App() {
+export function PlayPage() {
   const game = useChessGame()
   const { engine, ready } = useEngine()
 
@@ -197,7 +197,7 @@ function App() {
   const activePly = game.history.length - 1
 
   return (
-    <div className="min-h-screen flex justify-center bg-[#f7f6f1] px-6 py-8">
+    <div className="flex justify-center px-6 py-8">
       <div className="flex gap-6 w-full max-w-[1180px]">
         <aside className="w-64 shrink-0">
           <LeftSidebar
@@ -250,5 +250,3 @@ function App() {
     </div>
   )
 }
-
-export default App
