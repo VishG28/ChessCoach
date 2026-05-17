@@ -43,6 +43,15 @@ function MoveCell({
     >
       <span className="text-sm font-mono">
         {move.san}
+        {move.source === 'book' && (
+          <span
+            title={`Lichess database, ${Math.round((move.bookWeight ?? 0) * 100)}% frequency`}
+            className="ml-1 text-xs"
+            aria-label="book move"
+          >
+            📖
+          </span>
+        )}
         <ClassDot classification={move.classification} />
       </span>
     </td>

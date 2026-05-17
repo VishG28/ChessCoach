@@ -126,6 +126,15 @@ export function MoveDetails({ game, move, selectedPly }: MoveDetailsProps) {
       <div className="flex items-center gap-2 flex-wrap">
         <span className="text-zinc-500">{moverLabel}:</span>
         <span className="font-semibold font-mono">{move.san}</span>
+        {move.source === 'book' && (
+          <span
+            title={`Lichess database, ${Math.round((move.bookWeight ?? 0) * 100)}% frequency`}
+            className="text-xs"
+            aria-label="book move"
+          >
+            📖
+          </span>
+        )}
         {classificationLabel && (
           <span
             className={`px-2 py-0.5 rounded text-xs font-medium ${classificationBg} text-zinc-700`}

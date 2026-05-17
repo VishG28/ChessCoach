@@ -26,6 +26,7 @@ import type { CandidateLine, CoachingStyle, PreMoveContext } from '@/coaching/de
 import { useShortcut } from '@/lib/shortcuts'
 import { getBookMove } from '@/engine/openingBook'
 import type { MoveSource } from '@/games/types'
+import type { MoveSourceInfo } from '@/components/sidebar/RightSidebar'
 
 const STOCKFISH_MODEL_ID = 'stockfish-18'
 
@@ -165,6 +166,11 @@ export function PlayPage() {
   // Provenance metadata for the next opponent move. PlayPage sets this before
   // calling makeMove; useGameLogger reads and clears it as it persists the move.
   const lastOpponentMetaRef = useRef<OpponentMoveMeta | null>(null)
+
+  // Per-ply (0-based index into game.history) source map for the move list badge.
+  const [moveSources, setMoveSources] = useState<ReadonlyMap<number, MoveSourceInfo>>(
+    () => new Map(),
+  )
 
   // Log every move to persistent game storage with background analysis
   const { appendCoachMessage } = useGameLogger({
@@ -346,6 +352,16 @@ export function PlayPage() {
           engineModel: STOCKFISH_MODEL_ID,
           ...(bookWeight !== undefined ? { bookWeight } : {}),
         }
+        // Snapshot for the move-list badge (history index is ply - 1).
+        const historyIndex = ply - 1
+        setMoveSources((prev) => {
+          const next = new Map(prev)
+          next.set(historyIndex, {
+            source,
+            ...(bookWeight !== undefined ? { bookWeight } : {}),
+          })
+          return next
+        })
 
         const chosen = parseUciMove(chosenUci)
         game.makeMove({
@@ -388,6 +404,8 @@ export function PlayPage() {
     engineRequestIdRef.current++ // invalidate any in-flight engine move
     coach.dismissAlert()
     deepCoach.cancel()
+    lastOpponentMetaRef.current = null
+    setMoveSources(new Map())
     const next = resolveUserColor(colorChoice)
     game.setOrientation(next)
     game.reset()
@@ -399,11 +417,21 @@ export function PlayPage() {
     engineRequestIdRef.current++ // invalidate any in-flight engine move
     coach.dismissAlert()
     deepCoach.cancel()
+    lastOpponentMetaRef.current = null
     // If it's currently the user's turn, the last ply was the engine's reply
     // to the user's blunder; undo both. If it's the engine's turn, only the
     // user's most recent move has been played; undo just that.
     const pliesToUndo = game.turn === userColor ? 2 : 1
-    game.undo(Math.min(pliesToUndo, game.history.length))
+    const undone = Math.min(pliesToUndo, game.history.length)
+    const newLen = game.history.length - undone
+    setMoveSources((prev) => {
+      const next = new Map<number, MoveSourceInfo>()
+      for (const [k, v] of prev) {
+        if (k < newLen) next.set(k, v)
+      }
+      return next
+    })
+    game.undo(undone)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game.history.length, game.turn, userColor, coach.dismissAlert, deepCoach.cancel])
 
@@ -517,6 +545,7 @@ export function PlayPage() {
           evalCpWhitePov={evalCpWhitePov}
           mateIn={mateInWhitePov}
           activePly={activePly >= 0 ? activePly : null}
+          moveSources={moveSources}
         />
       </aside>
 

@@ -8,6 +8,12 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
 import { cn } from '@/lib/utils'
+import type { MoveSource } from '@/games/types'
+
+export interface MoveSourceInfo {
+  source: MoveSource
+  bookWeight?: number
+}
 
 export interface RightSidebarProps {
   /** Verbose chess.js history (Move[]). */
@@ -18,6 +24,11 @@ export interface RightSidebarProps {
   mateIn?: number | null
   /** Highlight which ply index is selected. -1 or null = none. */
   activePly?: number | null
+  /**
+   * Optional per-move provenance keyed by 0-based ply index (matches the index
+   * into `history`). When `source === 'book'` a 📖 badge is rendered.
+   */
+  moveSources?: ReadonlyMap<number, MoveSourceInfo>
 }
 
 /** Convert centipawn evaluation to White's share (0..1) using a logistic. */
@@ -68,6 +79,7 @@ export function RightSidebar({
   evalCpWhitePov,
   mateIn = null,
   activePly = null,
+  moveSources,
 }: RightSidebarProps) {
   const share = evalToWhiteShare(evalCpWhitePov, mateIn)
   const whitePct = Math.max(0, Math.min(1, share)) * 100
@@ -136,11 +148,17 @@ export function RightSidebar({
                       move={pair.white}
                       ply={pair.whitePly}
                       activePly={activePly}
+                      sourceInfo={
+                        pair.whitePly != null ? moveSources?.get(pair.whitePly) : undefined
+                      }
                     />
                     <PlyCell
                       move={pair.black}
                       ply={pair.blackPly}
                       activePly={activePly}
+                      sourceInfo={
+                        pair.blackPly != null ? moveSources?.get(pair.blackPly) : undefined
+                      }
                     />
                   </li>
                 ))}
@@ -157,13 +175,15 @@ interface PlyCellProps {
   move: Move | null
   ply: number | null
   activePly: number | null
+  sourceInfo?: MoveSourceInfo
 }
 
-function PlyCell({ move, ply, activePly }: PlyCellProps) {
+function PlyCell({ move, ply, activePly, sourceInfo }: PlyCellProps) {
   if (move == null || ply == null) {
     return <span className="text-neutral-300">·</span>
   }
   const isActive = activePly === ply
+  const isBook = sourceInfo?.source === 'book'
   return (
     <button
       type="button"
@@ -176,6 +196,15 @@ function PlyCell({ move, ply, activePly }: PlyCellProps) {
       data-ply={ply}
     >
       {move.san}
+      {isBook && (
+        <span
+          title={`Lichess database, ${Math.round((sourceInfo?.bookWeight ?? 0) * 100)}% frequency`}
+          className="ml-1 text-xs"
+          aria-label="book move"
+        >
+          📖
+        </span>
+      )}
     </button>
   )
 }
