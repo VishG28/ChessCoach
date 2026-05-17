@@ -1,5 +1,13 @@
 export type Classification = 'best' | 'good' | 'inaccuracy' | 'mistake' | 'blunder'
 
+export interface CoachMessageRecord {
+  trigger: 'pre_move' | 'post_move' | 'tell_me_more' | 'retrospective'
+  style: 'conversational' | 'socratic' | 'tactical'
+  depth: 'quick' | 'detail' | 'critical'
+  content: string
+  timestamp: number
+}
+
 export interface MoveAlternative {
   move: string // UCI
   cp: number
@@ -22,6 +30,8 @@ export interface MoveEntry {
   classification?: Classification
   coach_message?: string
   top_alternatives?: MoveAlternative[]
+  /** Per-move coaching messages from the deep coach. Backward-compat: generated from legacy coach_message on load. */
+  coach_messages?: CoachMessageRecord[]
 }
 
 export type GameResult = '1-0' | '0-1' | '1/2-1/2' | 'ongoing'

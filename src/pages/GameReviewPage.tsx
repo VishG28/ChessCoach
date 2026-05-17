@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { Download } from 'lucide-react'
 import { Chess } from 'chess.js'
-import { getGame } from '@/games/gameStore'
+import { getGame, updateMove } from '@/games/gameStore'
 import type { Game } from '@/games/types'
 import { ReviewBoard } from '@/components/review/ReviewBoard'
 import { MoveList } from '@/components/review/MoveList'
@@ -11,6 +11,11 @@ import { EvalGraph } from '@/components/review/EvalGraph'
 import { NavControls } from '@/components/review/NavControls'
 import { Button } from '@/components/ui/button'
 import { downloadPgn } from '@/lib/pgn'
+import { CoachMessage } from '@/components/coaching/CoachMessage'
+import { useDeepCoach } from '@/coaching/useDeepCoach'
+import type { LiveCoachMessage } from '@/coaching/useDeepCoach'
+import type { PreMoveContext } from '@/coaching/deepCoach'
+import { useApiKey } from '@/coaching/apiKey'
 
 const STARTING_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
 const AUTOPLAY_INTERVAL_MS = 1000
@@ -53,6 +58,33 @@ export function GameReviewPage() {
   const [selectedPly, setSelectedPly] = useState(0)
   const [autoplaying, setAutoplaying] = useState(false)
   const autoplayRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const { hasKey } = useApiKey()
+
+  const deepCoach = useDeepCoach({
+    style: 'conversational',
+    enabled: hasKey,
+    onComplete: useCallback((msg: LiveCoachMessage) => {
+      // Persist the completed message to the game record
+      if (!id) return
+      const currentGame = getGame(id)
+      if (!currentGame) return
+      const ply = selectedPly > 0 ? selectedPly : 1
+      const move = currentGame.moves.find((m) => m.ply === ply)
+      const existing = move?.coach_messages ?? []
+      updateMove(id, ply, {
+        coach_messages: [...existing, {
+          trigger: msg.trigger,
+          style: msg.style,
+          depth: msg.depth,
+          content: msg.content,
+          timestamp: msg.timestamp,
+        }],
+      })
+      // Reload the game to get updated coach_messages
+      setGame(getGame(id) ?? null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [id, selectedPly]),
+  })
 
   // Load game from storage
   useEffect(() => {
@@ -144,6 +176,68 @@ export function GameReviewPage() {
   const orientation = boardOrientation(game)
   const selectedMove = selectedPly > 0 ? (game.moves[selectedPly - 1] ?? null) : null
 
+  // Persisted coach messages for the selected move
+  const persistedMessages: LiveCoachMessage[] = (selectedMove?.coach_messages ?? []).map((r) => ({
+    id: `${r.trigger}-${r.timestamp}`,
+    trigger: r.trigger,
+    style: r.style,
+    depth: r.depth,
+    content: r.content,
+    streaming: false,
+    timestamp: r.timestamp,
+    fen: selectedMove?.fen_before ?? currentFen,
+  }))
+
+  // Combine persisted with live deep coach messages for this position
+  const allMessages = [...persistedMessages, ...deepCoach.messages.filter((m) => m.fen === currentFen)]
+
+  const handleGetCoaching = () => {
+    if (!selectedMove) return
+    const fenBefore = selectedMove.fen_before
+    const evalBefore = selectedMove.engine_eval_before
+    let bestMoveSan = evalBefore?.bestMove ?? ''
+    try {
+      const chess = new Chess(fenBefore)
+      const from = bestMoveSan.slice(0, 2)
+      const to = bestMoveSan.slice(2, 4)
+      const prom = bestMoveSan.length >= 5 ? (bestMoveSan[4] as 'q' | 'r' | 'b' | 'n') : undefined
+      const m = chess.move({ from, to, promotion: prom })
+      if (m) bestMoveSan = m.san
+    } catch { /* ignore */ }
+
+    const pvSan: string[] = []
+    try {
+      const pvChess = new Chess(fenBefore)
+      for (const uci of (evalBefore?.pv ?? []).slice(0, 5)) {
+        const from = uci.slice(0, 2)
+        const to = uci.slice(2, 4)
+        const prom = uci.length >= 5 ? (uci[4] as 'q' | 'r' | 'b' | 'n') : undefined
+        const m = pvChess.move({ from, to, promotion: prom })
+        if (!m) break
+        pvSan.push(m.san)
+      }
+    } catch { /* ignore */ }
+
+    const preMoveCtx: PreMoveContext = {
+      fen: fenBefore,
+      recentMovesSan: game.moves.slice(Math.max(0, selectedPly - 8), selectedPly).map((m) => m.san),
+      color: selectedMove.side === 'w' ? 'white' : 'black',
+      bestMoveSan: bestMoveSan || '(unknown)',
+      bestEvalCp: evalBefore?.cp ?? 0,
+      candidatesSan: bestMoveSan ? [{ san: bestMoveSan, cp: evalBefore?.cp ?? 0 }] : [],
+      pvSan,
+      materialSummary: 'even',
+      userElo: game.engineElo,
+    }
+
+    deepCoach.fire({
+      trigger: 'retrospective',
+      depth: 'detail',
+      fen: fenBefore,
+      preMove: preMoveCtx,
+    })
+  }
+
   // Unused but available for debug
   void fenTurn
 
@@ -202,6 +296,37 @@ export function GameReviewPage() {
               selectedPly={selectedPly}
             />
           </div>
+
+          {/* Coach messages for the selected move */}
+          {selectedMove && (
+            <div className="space-y-3">
+              {allMessages.map((msg) => (
+                <CoachMessage
+                  key={msg.id}
+                  message={msg}
+                  onTellMore={() => {
+                    deepCoach.fire({
+                      trigger: 'tell_me_more',
+                      depth: msg.depth,
+                      fen: msg.fen,
+                      followUp: 'Go deeper on this position. What else should I notice? Any obscure tactical or strategic ideas I should know about?',
+                    })
+                  }}
+                  onQuieter={() => { /* no-op in review */ }}
+                />
+              ))}
+              {hasKey && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleGetCoaching}
+                  disabled={deepCoach.messages.some((m) => m.streaming)}
+                >
+                  Get coaching for this position
+                </Button>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Right column: move list */}

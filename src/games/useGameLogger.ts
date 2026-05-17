@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import type { UseChessGameResult } from '@/lib/useChessGame'
 import { analyzePosition } from '@/engine/analysisEngine'
 import {
@@ -7,9 +7,10 @@ import {
   updateMove,
   setGamePgn,
   finalizeGame,
+  getGame,
 } from './gameStore'
 import { classify } from './classification'
-import type { GameResult } from './types'
+import type { CoachMessageRecord, GameResult } from './types'
 
 export interface GameLoggerInput {
   game: UseChessGameResult
@@ -22,6 +23,8 @@ export interface GameLoggerInput {
 
 export interface GameLoggerOutput {
   currentGameId: string | null
+  /** Imperatively append a coach message to the stored move at the given ply. */
+  appendCoachMessage: (ply: number, msg: CoachMessageRecord) => void
 }
 
 function mapGameResult(game: UseChessGameResult): GameResult {
@@ -156,5 +159,15 @@ export function useGameLogger(input: GameLoggerInput): GameLoggerOutput {
     prevIsGameOverRef.current = isOver
   })
 
-  return { currentGameId: currentGameIdRef.current }
+  const appendCoachMessage = useCallback((ply: number, msg: CoachMessageRecord): void => {
+    const gameId = currentGameIdRef.current
+    if (!gameId) return
+    const game = getGame(gameId)
+    if (!game) return
+    const move = game.moves.find((m) => m.ply === ply)
+    const existing = move?.coach_messages ?? []
+    updateMove(gameId, ply, { coach_messages: [...existing, msg] })
+  }, [])
+
+  return { currentGameId: currentGameIdRef.current, appendCoachMessage }
 }

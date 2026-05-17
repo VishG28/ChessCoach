@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Chess } from 'chess.js'
 import type { Color, Square } from 'chess.js'
 import { useLocation } from 'react-router-dom'
@@ -19,6 +19,8 @@ import { useEngine, parseUciMove } from '@/engine/engine'
 import { useChessGame } from '@/lib/useChessGame'
 import { getWeakeningParams, humanThinkDelay, selectMove } from '@/engine/weakening'
 import { useGameLogger } from '@/games/useGameLogger'
+import { useDeepCoach, type LiveCoachMessage } from '@/coaching/useDeepCoach'
+import type { CoachingStyle, PreMoveContext } from '@/coaching/deepCoach'
 
 /** Convert a UCI move to SAN given a FEN. Returns UCI string unchanged on failure. */
 function uciToSanLocal(fen: string, uci: string): string {
@@ -50,6 +52,7 @@ export function PlayPage() {
   const [elo, setElo] = useState(DEFAULT_ELO)
   const [colorChoice, setColorChoice] = useState<UserColor>(DEFAULT_USER_COLOR)
   const [coachMode, setCoachMode] = useState<CoachMode>(DEFAULT_COACH_MODE)
+  const [coachingStyle, setCoachingStyle] = useState<CoachingStyle>('conversational')
   const [debugOpen, setDebugOpen] = useState(false)
   const [engineThinking, setEngineThinking] = useState(false)
 
@@ -109,9 +112,7 @@ export function PlayPage() {
   })
 
   // LLM explanation wiring (key is held in memory only, accessed lazily)
-  // hasKey is referenced by useExplain via useApiKey() but we expose it for
-  // future deep-coach gating in Wave 4.
-  useApiKey()
+  const { hasKey } = useApiKey()
   const blunderAlert = coach.blunderAlert
 
   // Build the BlunderContext only when there's an active blunder alert.
@@ -170,7 +171,7 @@ export function PlayPage() {
   })
 
   // Log every move to persistent game storage with background analysis
-  useGameLogger({
+  const { appendCoachMessage } = useGameLogger({
     game,
     engineElo: elo,
     userColor: userColor === 'w' ? 'white' : 'black',
@@ -179,6 +180,90 @@ export function PlayPage() {
       ? { ply: game.history.length, text: `Blunder: ${coach.blunderAlert.san} lost ${coach.blunderAlert.loss}cp. Engine prefers ${coach.blunderAlert.better}.` }
       : null,
   })
+
+  // Refs for the current pre/post move context so Tell Me More can reference them
+  const lastPreMoveCtxRef = useRef<PreMoveContext | null>(null)
+
+  // Deep coach: streaming multi-layer coaching messages
+  const deepCoach = useDeepCoach({
+    style: coachingStyle,
+    enabled: coachMode === 'full' && hasKey,
+    onComplete: useCallback((msg: LiveCoachMessage) => {
+      // Persist the completed message against the current ply
+      appendCoachMessage(game.history.length, {
+        trigger: msg.trigger,
+        style: msg.style,
+        depth: msg.depth,
+        content: msg.content,
+        timestamp: msg.timestamp,
+      })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [appendCoachMessage, game.history.length]),
+  })
+
+  // Pre-move coaching: fire when it becomes the user's turn
+  useEffect(() => {
+    if (game.isGameOver) return
+    if (game.turn !== userColor) return
+    if (coachMode !== 'full' || !hasKey) return
+    if (!coach.liveEval) return
+
+    // Build PreMoveContext from available engine data
+    const liveEval = coach.liveEval
+    const recentMovesSan = game.history.slice(-8).map((m) => m.san)
+    const bestMoveSan = uciToSanLocal(game.fen, liveEval.bestMove)
+    const pvSan: string[] = []
+    try {
+      const pvChess = new Chess(game.fen)
+      for (const uci of (liveEval.pv ?? []).slice(0, 5)) {
+        const from = uci.slice(0, 2)
+        const to = uci.slice(2, 4)
+        const prom = uci.length >= 5 ? (uci[4] as 'q' | 'r' | 'b' | 'n') : undefined
+        const m = pvChess.move({ from, to, promotion: prom })
+        if (!m) break
+        pvSan.push(m.san)
+      }
+    } catch { /* ignore */ }
+
+    const ctx: PreMoveContext = {
+      fen: game.fen,
+      recentMovesSan,
+      color: userColor === 'w' ? 'white' : 'black',
+      bestMoveSan,
+      bestEvalCp: liveEval.cp,
+      candidatesSan: [{ san: bestMoveSan, cp: liveEval.cp }],
+      pvSan,
+      materialSummary: 'even',
+      userElo: elo,
+    }
+    lastPreMoveCtxRef.current = ctx
+
+    deepCoach.fire({
+      trigger: 'pre_move',
+      depth: 'detail',
+      fen: game.fen,
+      preMove: ctx,
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [game.fen, game.turn, game.isGameOver, coachMode, hasKey, coachingStyle])
+
+  // Tell Me More handler
+  const handleTellMore = useCallback((messageId: string) => {
+    const msg = deepCoach.messages.find((m) => m.id === messageId)
+    if (!msg) return
+    deepCoach.fire({
+      trigger: 'tell_me_more',
+      depth: msg.depth,
+      fen: msg.fen,
+      preMove: lastPreMoveCtxRef.current ?? undefined,
+      followUp: 'Go deeper on this position. What else should I notice? Any obscure tactical or strategic ideas I should know about? What would a master player consider here?',
+    })
+  }, [deepCoach])
+
+  // Quieter handler: downgrade to warnings mode
+  const handleQuieter = useCallback(() => {
+    setCoachMode('warnings')
+  }, [])
 
   // Engine plays the opposite color. Use a request-id ref to discard stale
   // bestmoves if the position changes (takeback, new game) mid-search.
@@ -264,24 +349,44 @@ export function PlayPage() {
     })
   }
 
-  const handleNewGame = (): void => {
+  const handleNewGame = useCallback((): void => {
     engineRequestIdRef.current++ // invalidate any in-flight engine move
     coach.dismissAlert()
+    deepCoach.cancel()
     const next = resolveUserColor(colorChoice)
     game.setOrientation(next)
     game.reset()
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [colorChoice, coach.dismissAlert, deepCoach.cancel])
 
-  const handleTakeBack = (): void => {
+  const handleTakeBack = useCallback((): void => {
     if (game.history.length === 0) return
     engineRequestIdRef.current++ // invalidate any in-flight engine move
     coach.dismissAlert()
+    deepCoach.cancel()
     // If it's currently the user's turn, the last ply was the engine's reply
     // to the user's blunder; undo both. If it's the engine's turn, only the
     // user's most recent move has been played; undo just that.
     const pliesToUndo = game.turn === userColor ? 2 : 1
     game.undo(Math.min(pliesToUndo, game.history.length))
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [game.history.length, game.turn, userColor, coach.dismissAlert, deepCoach.cancel])
+
+  // Global event listeners for command palette / keyboard shortcuts
+  useEffect(() => {
+    const onNewGame = () => handleNewGame()
+    const onTakeBack = () => handleTakeBack()
+    const onFlipBoard = () => game.setOrientation(game.orientation === 'white' ? 'black' : 'white')
+    window.addEventListener('cc:new-game', onNewGame)
+    window.addEventListener('cc:take-back', onTakeBack)
+    window.addEventListener('cc:flip-board', onFlipBoard)
+    return () => {
+      window.removeEventListener('cc:new-game', onNewGame)
+      window.removeEventListener('cc:take-back', onTakeBack)
+      window.removeEventListener('cc:flip-board', onFlipBoard)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [handleNewGame, handleTakeBack])
 
   // Eval bar wants White-POV centipawns. EngineEval.cp is from side-to-move
   // POV at the evaluated FEN, which (for liveEval) corresponds to game.turn.
@@ -316,6 +421,8 @@ export function PlayPage() {
             onTakeBack={handleTakeBack}
             canTakeBack={game.history.length > 0}
             engineStatus={ready ? 'ready' : 'loading'}
+            coachingStyle={coachingStyle}
+            onCoachingStyleChange={setCoachingStyle}
           />
         </aside>
 
@@ -340,6 +447,9 @@ export function PlayPage() {
             onDismissAlert={coach.dismissAlert}
             onTakeBackBlunder={handleTakeBack}
             explain={explain}
+            messages={deepCoach.messages}
+            onTellMore={handleTellMore}
+            onQuieter={handleQuieter}
           />
         </main>
 
