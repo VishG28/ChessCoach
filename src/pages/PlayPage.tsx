@@ -23,6 +23,7 @@ import { useEngine, parseUciMove } from '@/engine/engine'
 import { useChessGame } from '@/lib/useChessGame'
 import { humanThinkDelay } from '@/engine/weakening'
 import { useGameLogger, type OpponentMoveMeta } from '@/games/useGameLogger'
+import { getGame, finalizeGame, clearGameCoaching } from '@/games/gameStore'
 import { useDeepCoach, uciPvToSan, uciToSan, type LiveCoachMessage } from '@/coaching/useDeepCoach'
 import type { CandidateLine, CoachingStyle, PreMoveContext } from '@/coaching/deepCoach'
 import { useShortcut } from '@/lib/shortcuts'
@@ -60,7 +61,27 @@ export function PlayPage() {
   const [elo, setElo] = useState(DEFAULT_ELO)
   const [colorChoice, setColorChoice] = useState<UserColor>(DEFAULT_USER_COLOR)
   const [coachMode, setCoachMode] = useState<CoachMode>(DEFAULT_COACH_MODE)
-  const [coachingStyle, setCoachingStyle] = useState<CoachingStyle>('conversational')
+  const [coachingStyle, setCoachingStyle] = useState<CoachingStyle>(() => {
+    try {
+      const v = localStorage.getItem('cc.coachingStyle.v1')
+      if (v === 'conversational' || v === 'socratic' || v === 'tactical') return v
+    } catch { /* ignore */ }
+    return 'conversational'
+  })
+  // Persist the chosen style across sessions.
+  useEffect(() => {
+    try {
+      localStorage.setItem('cc.coachingStyle.v1', coachingStyle)
+    } catch { /* ignore */ }
+  }, [coachingStyle])
+  // Track when the style was just changed so the pre-move effect can skip
+  // re-firing on the current ply (avoids spam when toggling mid-turn).
+  const styleJustChangedRef = useRef(false)
+  const prevStyleRef = useRef(coachingStyle)
+  if (prevStyleRef.current !== coachingStyle) {
+    prevStyleRef.current = coachingStyle
+    styleJustChangedRef.current = true
+  }
   const [debugOpen, setDebugOpen] = useState(false)
   const [engineThinking, setEngineThinking] = useState(false)
   const [engineMode, setEngineMode] = useState<OpponentMode>(getDefaultEngine())
@@ -183,7 +204,7 @@ export function PlayPage() {
   )
 
   // Log every move to persistent game storage with background analysis
-  const { appendCoachMessage } = useGameLogger({
+  const { appendCoachMessage, currentGameId } = useGameLogger({
     game,
     engineElo: elo,
     userColor: userColor === 'w' ? 'white' : 'black',
@@ -222,6 +243,12 @@ export function PlayPage() {
     if (game.turn !== userColor) return
     if (coachMode !== 'full' || !hasKey) return
     if (!coach.liveEval) return
+    // If this effect ran solely because the user switched coaching style
+    // mid-ply, skip the re-fire to avoid spamming the same position.
+    if (styleJustChangedRef.current) {
+      styleJustChangedRef.current = false
+      return
+    }
 
     // Build PreMoveContext from available engine data
     const liveEval = coach.liveEval
@@ -398,11 +425,26 @@ export function PlayPage() {
     deepCoach.cancel()
     lastOpponentMetaRef.current = null
     setMoveSources(new Map())
+
+    // Abandonment: if the previous game exists and is still ongoing, finalize
+    // it as a draw and (unless opted in) clear its coaching before the reset.
+    if (currentGameId) {
+      const prev = getGame(currentGameId)
+      if (prev && prev.result === 'ongoing') {
+        finalizeGame(currentGameId, '1/2-1/2', game.pgn ?? '')
+        const keepCoaching = ((): boolean => {
+          try { return localStorage.getItem('cc.keepCoaching.v1') === '1' } catch { return false }
+        })()
+        if (!keepCoaching) clearGameCoaching(currentGameId)
+        toast('Previous game saved as abandoned')
+      }
+    }
+
     const next = resolveUserColor(colorChoice)
     game.setOrientation(next)
     game.reset()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [colorChoice, coach.dismissAlert, deepCoach.cancel])
+  }, [colorChoice, coach.dismissAlert, deepCoach.cancel, currentGameId])
 
   const handleTakeBack = useCallback((): void => {
     if (game.history.length === 0) return
