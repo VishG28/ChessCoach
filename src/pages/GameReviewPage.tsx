@@ -10,6 +10,7 @@ import { MoveDetails } from '@/components/review/MoveDetails'
 import { EvalGraph } from '@/components/review/EvalGraph'
 import { NavControls } from '@/components/review/NavControls'
 import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
 import { downloadPgn } from '@/lib/pgn'
 import { CoachMessage } from '@/components/coaching/CoachMessage'
 import { useDeepCoach } from '@/coaching/useDeepCoach'
@@ -242,29 +243,33 @@ export function GameReviewPage() {
   void fenTurn
 
   return (
-    <main className="max-w-[1180px] mx-auto px-6 py-8">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-4">
-          <Link to="/games" className="text-zinc-500 hover:text-zinc-800 text-sm">
-            ← Games
-          </Link>
-          <h1 className="text-xl font-semibold text-zinc-800">
-            Review — {new Date(game.startedAt).toLocaleString()}
-          </h1>
-        </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => downloadPgn(game)}
-          title="Export PGN"
-        >
-          <Download className="w-4 h-4 mr-1.5" />
-          Export PGN
-        </Button>
-      </div>
+    <main className="max-w-[1180px] mx-auto px-6 py-8 space-y-6">
+      {/* Metadata bar */}
+      <Card>
+        <CardContent className="flex items-center justify-between py-3 px-4 gap-4 flex-wrap">
+          <div className="flex items-center gap-4">
+            <Link to="/games" className="text-muted-foreground hover:text-foreground text-sm">
+              ← Games
+            </Link>
+            <h1 className="text-lg font-semibold">
+              Review — {new Date(game.startedAt).toLocaleString()}
+            </h1>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => downloadPgn(game)}
+            title="Export PGN"
+          >
+            <Download className="w-4 h-4 mr-1.5" />
+            Export PGN
+          </Button>
+        </CardContent>
+      </Card>
 
-      <div className="grid grid-cols-[auto_1fr] gap-6 items-start">
-        {/* Left column: board + controls + graph + details */}
+      {/* Main body: board left, move details right */}
+      <div className="grid grid-cols-1 md:grid-cols-[560px_1fr] gap-6 items-start">
+        {/* Left column: board + nav controls */}
         <div className="flex flex-col gap-4">
           <ReviewBoard
             fen={currentFen}
@@ -281,21 +286,39 @@ export function GameReviewPage() {
             onLast={() => handleSelectPly(totalPlies)}
             onToggleAutoplay={handleToggleAutoplay}
           />
-          <div className="bg-white rounded-lg border border-zinc-200 p-3">
-            <div className="text-xs text-zinc-400 mb-2 uppercase tracking-wide">Eval</div>
-            <EvalGraph
-              moves={game.moves}
-              selectedPly={selectedPly}
-              onSelectPly={handleSelectPly}
-            />
-          </div>
-          <div className="bg-white rounded-lg border border-zinc-200 min-h-[120px]">
+          {/* Eval graph below board, full width of left column */}
+          <Card>
+            <CardContent className="p-3">
+              <div className="text-xs text-muted-foreground mb-2 uppercase tracking-wide">Eval</div>
+              <EvalGraph
+                moves={game.moves}
+                selectedPly={selectedPly}
+                onSelectPly={handleSelectPly}
+              />
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Right column: move details + move list + coach messages */}
+        <div className="flex flex-col gap-4">
+          <Card>
             <MoveDetails
               game={game}
               move={selectedMove}
               selectedPly={selectedPly}
             />
-          </div>
+          </Card>
+
+          <Card>
+            <div className="px-4 py-3 border-b text-sm font-medium">
+              Moves
+            </div>
+            <MoveList
+              moves={game.moves}
+              selectedPly={selectedPly}
+              onSelectPly={handleSelectPly}
+            />
+          </Card>
 
           {/* Coach messages for the selected move */}
           {selectedMove && (
@@ -327,18 +350,6 @@ export function GameReviewPage() {
               )}
             </div>
           )}
-        </div>
-
-        {/* Right column: move list */}
-        <div className="bg-white rounded-lg border border-zinc-200">
-          <div className="px-4 py-3 border-b border-zinc-100 text-sm font-medium text-zinc-700">
-            Moves
-          </div>
-          <MoveList
-            moves={game.moves}
-            selectedPly={selectedPly}
-            onSelectPly={handleSelectPly}
-          />
         </div>
       </div>
     </main>
