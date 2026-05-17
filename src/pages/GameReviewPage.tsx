@@ -2,8 +2,9 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { Download } from 'lucide-react'
 import { Chess } from 'chess.js'
-import { getGame, updateMove } from '@/games/gameStore'
-import type { Game } from '@/games/types'
+import { toast } from 'sonner'
+import { getGame } from '@/games/gameStore'
+import type { Game, MoveEntry } from '@/games/types'
 import { ReviewBoard } from '@/components/review/ReviewBoard'
 import { MoveList } from '@/components/review/MoveList'
 import { MoveDetails } from '@/components/review/MoveDetails'
@@ -13,9 +14,11 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { downloadPgn } from '@/lib/pgn'
 import { CoachMessage } from '@/components/coaching/CoachMessage'
-import { useDeepCoach } from '@/coaching/useDeepCoach'
 import type { LiveCoachMessage } from '@/coaching/useDeepCoach'
-import type { CandidateLine, PreMoveContext } from '@/coaching/deepCoach'
+import {
+  type PostMoveContext,
+  streamCoachMessage,
+} from '@/coaching/deepCoach'
 import { useApiKey } from '@/coaching/apiKey'
 import { useShortcut } from '@/lib/shortcuts'
 
@@ -44,14 +47,71 @@ function boardOrientation(game: Game): 'white' | 'black' {
   return game.userColor
 }
 
-/** Infer orientation from FEN's side-to-move if needed */
-function fenTurn(fen: string): 'w' | 'b' {
+/** Convert a single UCI move to SAN at the given FEN, falling back to UCI on error. */
+function uciToSan(fen: string, uci: string): string {
   try {
     const chess = new Chess(fen)
-    return chess.turn()
+    const from = uci.slice(0, 2)
+    const to = uci.slice(2, 4)
+    const promotion = uci.length >= 5 ? (uci[4] as 'q' | 'r' | 'b' | 'n') : undefined
+    return chess.move({ from, to, promotion })?.san ?? uci
   } catch {
-    return 'w'
+    return uci
   }
+}
+
+/** Convert a UCI principal variation to SAN, stopping at first illegal move. */
+function pvUciToSan(fen: string, pvUci: readonly string[], maxPlies = 6): string[] {
+  const out: string[] = []
+  try {
+    const chess = new Chess(fen)
+    for (const uci of pvUci.slice(0, maxPlies)) {
+      const from = uci.slice(0, 2)
+      const to = uci.slice(2, 4)
+      const promotion = uci.length >= 5 ? (uci[4] as 'q' | 'r' | 'b' | 'n') : undefined
+      const m = chess.move({ from, to, promotion })
+      if (!m) break
+      out.push(m.san)
+    }
+  } catch { /* ignore */ }
+  return out
+}
+
+/**
+ * Build a PostMoveContext from a stored MoveEntry. Falls back to safe defaults
+ * for any missing engine eval data — retrospective coaching should still be
+ * runnable on partial records.
+ */
+function buildPostMoveContext(game: Game, move: MoveEntry): PostMoveContext {
+  const evalBefore = move.engine_eval_before
+  const evalAfter = move.engine_eval_after
+  const bestMoveSan = evalBefore?.bestMove
+    ? uciToSan(move.fen_before, evalBefore.bestMove)
+    : '(unknown)'
+  const bestPvSan = evalBefore?.pv ? pvUciToSan(move.fen_before, evalBefore.pv, 6) : []
+  const engineResponsePvSan = evalAfter?.pv ? pvUciToSan(move.fen_after, evalAfter.pv, 6) : []
+  const recentMovesSan = game.moves
+    .slice(Math.max(0, move.ply - 8), move.ply)
+    .map((m) => m.san)
+  const cpLoss = move.centipawn_loss ?? 0
+  const classification: PostMoveContext['classification'] =
+    cpLoss >= 200 ? 'blunder' : cpLoss >= 100 ? 'mistake' : cpLoss >= 50 ? 'inaccuracy' : 'inaccuracy'
+  return {
+    userMoveSan: move.san,
+    classification,
+    centipawnLoss: cpLoss,
+    fenBefore: move.fen_before,
+    fenAfter: move.fen_after,
+    bestMoveSan,
+    bestPvSan,
+    engineResponsePvSan,
+    recentMovesSan,
+  }
+}
+
+interface RetroEntry {
+  text: string
+  loading: boolean
 }
 
 export function GameReviewPage() {
@@ -60,33 +120,18 @@ export function GameReviewPage() {
   const [selectedPly, setSelectedPly] = useState(0)
   const [autoplaying, setAutoplaying] = useState(false)
   const autoplayRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const { hasKey } = useApiKey()
+  const { hasKey, getKey } = useApiKey()
 
-  const deepCoach = useDeepCoach({
-    style: 'conversational',
-    enabled: hasKey,
-    onComplete: useCallback((msg: LiveCoachMessage) => {
-      // Persist the completed message to the game record
-      if (!id) return
-      const currentGame = getGame(id)
-      if (!currentGame) return
-      const ply = selectedPly > 0 ? selectedPly : 1
-      const move = currentGame.moves.find((m) => m.ply === ply)
-      const existing = move?.coach_messages ?? []
-      updateMove(id, ply, {
-        coach_messages: [...existing, {
-          trigger: msg.trigger,
-          style: msg.style,
-          depth: msg.depth,
-          content: msg.content,
-          timestamp: msg.timestamp,
-        }],
-      })
-      // Reload the game to get updated coach_messages
-      setGame(getGame(id) ?? null)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [id, selectedPly]),
-  })
+  /** Ephemeral retrospective coaching per ply — lives only for the lifetime of this view. */
+  const [retro, setRetro] = useState<Map<number, RetroEntry>>(new Map())
+  /** Active retrospective request, aborted on unmount or new request. */
+  const retroAcRef = useRef<AbortController | null>(null)
+
+  // Cancel any in-flight retrospective on unmount.
+  useEffect(() => () => {
+    retroAcRef.current?.abort()
+    retroAcRef.current = null
+  }, [])
 
   // Load game from storage
   useEffect(() => {
@@ -154,6 +199,58 @@ export function GameReviewPage() {
     setAutoplaying((v) => !v)
   }, [])
 
+  const onRequestRetrospective = useCallback(async (ply: number): Promise<void> => {
+    if (!game) return
+    const apiKey = getKey()
+    if (!apiKey) {
+      toast.error('Add an API key first')
+      return
+    }
+    const move = game.moves.find((m) => m.ply === ply)
+    if (!move) return
+
+    // Cancel any previous in-flight retrospective.
+    retroAcRef.current?.abort()
+    const ac = new AbortController()
+    retroAcRef.current = ac
+
+    setRetro((prev) => new Map(prev).set(ply, { text: '', loading: true }))
+
+    const ctx = buildPostMoveContext(game, move)
+    let acc = ''
+    try {
+      const gen = streamCoachMessage(
+        {
+          apiKey,
+          style: 'conversational',
+          depth: 'retrospective',
+          postMove: ctx,
+          signal: ac.signal,
+        },
+        () => { /* cost tracking handled elsewhere */ },
+      )
+      while (true) {
+        const next = await gen.next()
+        if (next.done) break
+        acc += next.value
+        setRetro((prev) => new Map(prev).set(ply, { text: acc, loading: true }))
+      }
+      setRetro((prev) => new Map(prev).set(ply, { text: acc, loading: false }))
+    } catch (e) {
+      if (ac.signal.aborted) {
+        // Silently drop aborted retrospectives.
+        setRetro((prev) => {
+          const next = new Map(prev)
+          next.delete(ply)
+          return next
+        })
+        return
+      }
+      const errMsg = e instanceof Error ? e.message : 'Coach error'
+      setRetro((prev) => new Map(prev).set(ply, { text: errMsg, loading: false }))
+    }
+  }, [game, getKey])
+
   if (game === undefined) {
     return (
       <main className="max-w-[1180px] mx-auto px-6 py-8">
@@ -179,7 +276,7 @@ export function GameReviewPage() {
   const orientation = boardOrientation(game)
   const selectedMove = selectedPly > 0 ? (game.moves[selectedPly - 1] ?? null) : null
 
-  // Persisted coach messages for the selected move
+  // Persisted coach messages for the selected move (pre-Phase-5 games may have these).
   const persistedMessages: LiveCoachMessage[] = (selectedMove?.coach_messages ?? []).map((r) => ({
     id: `${r.trigger}-${r.timestamp}`,
     trigger: r.trigger,
@@ -190,63 +287,6 @@ export function GameReviewPage() {
     timestamp: r.timestamp,
     fen: selectedMove?.fen_before ?? currentFen,
   }))
-
-  // Combine persisted with live deep coach messages for this position
-  const allMessages = [...persistedMessages, ...deepCoach.messages.filter((m) => m.fen === currentFen)]
-
-  const handleGetCoaching = () => {
-    if (!selectedMove) return
-    const fenBefore = selectedMove.fen_before
-    const evalBefore = selectedMove.engine_eval_before
-    let bestMoveSan = evalBefore?.bestMove ?? ''
-    try {
-      const chess = new Chess(fenBefore)
-      const from = bestMoveSan.slice(0, 2)
-      const to = bestMoveSan.slice(2, 4)
-      const prom = bestMoveSan.length >= 5 ? (bestMoveSan[4] as 'q' | 'r' | 'b' | 'n') : undefined
-      const m = chess.move({ from, to, promotion: prom })
-      if (m) bestMoveSan = m.san
-    } catch { /* ignore */ }
-
-    const pvSan: string[] = []
-    try {
-      const pvChess = new Chess(fenBefore)
-      for (const uci of (evalBefore?.pv ?? []).slice(0, 5)) {
-        const from = uci.slice(0, 2)
-        const to = uci.slice(2, 4)
-        const prom = uci.length >= 5 ? (uci[4] as 'q' | 'r' | 'b' | 'n') : undefined
-        const m = pvChess.move({ from, to, promotion: prom })
-        if (!m) break
-        pvSan.push(m.san)
-      }
-    } catch { /* ignore */ }
-
-    const candidates: CandidateLine[] = bestMoveSan
-      ? [{ san: bestMoveSan, cp: evalBefore?.cp ?? 0, pvSan }]
-      : []
-
-    const preMoveCtx: PreMoveContext = {
-      fen: fenBefore,
-      recentMovesSan: game.moves.slice(Math.max(0, selectedPly - 8), selectedPly).map((m) => m.san),
-      color: selectedMove.side === 'w' ? 'white' : 'black',
-      bestMoveSan: bestMoveSan || '(unknown)',
-      bestEvalCp: evalBefore?.cp ?? 0,
-      candidates,
-      pvSan,
-      materialSummary: 'even',
-      userElo: game.engineElo,
-    }
-
-    deepCoach.fire({
-      trigger: 'retrospective',
-      depth: 'detail',
-      fen: fenBefore,
-      preMove: preMoveCtx,
-    })
-  }
-
-  // Unused but available for debug
-  void fenTurn
 
   return (
     <main className="max-w-[1180px] mx-auto px-6 py-8 space-y-6">
@@ -305,13 +345,16 @@ export function GameReviewPage() {
           </Card>
         </div>
 
-        {/* Right column: move details + move list + coach messages */}
+        {/* Right column: move details + move list + persisted coach messages */}
         <div className="flex flex-col gap-4">
           <Card>
             <MoveDetails
               game={game}
               move={selectedMove}
               selectedPly={selectedPly}
+              hasApiKey={hasKey}
+              retrospective={selectedMove ? retro.get(selectedMove.ply) : undefined}
+              onRequestRetrospective={onRequestRetrospective}
             />
           </Card>
 
@@ -326,34 +369,12 @@ export function GameReviewPage() {
             />
           </Card>
 
-          {/* Coach messages for the selected move */}
-          {selectedMove && (
+          {/* Persisted coach messages (pre-Phase-5 games may have these). */}
+          {selectedMove && persistedMessages.length > 0 && (
             <div className="space-y-3">
-              {allMessages.map((msg) => (
-                <CoachMessage
-                  key={msg.id}
-                  message={msg}
-                  onTellMore={() => {
-                    deepCoach.fire({
-                      trigger: 'tell_me_more',
-                      depth: msg.depth,
-                      fen: msg.fen,
-                      followUp: 'Go deeper on this position. What else should I notice? Any obscure tactical or strategic ideas I should know about?',
-                    })
-                  }}
-                  onQuieter={() => { /* no-op in review */ }}
-                />
+              {persistedMessages.map((msg) => (
+                <CoachMessage key={msg.id} message={msg} />
               ))}
-              {hasKey && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={handleGetCoaching}
-                  disabled={deepCoach.messages.some((m) => m.streaming)}
-                >
-                  Get coaching for this position
-                </Button>
-              )}
             </div>
           )}
         </div>

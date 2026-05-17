@@ -11,11 +11,22 @@ import { useExplain } from '@/coaching/useExplain'
 import type { BlunderContext } from '@/coaching/llmCoach'
 import { ExplainBox } from '@/components/coaching/ExplainBox'
 
+interface RetrospectiveState {
+  text: string
+  loading: boolean
+}
+
 interface MoveDetailsProps {
   game: Game
   move: MoveEntry | null
   /** ply 0 = no move selected (start position) */
   selectedPly: number
+  /** True if an API key is configured (gates retrospective coaching CTA). */
+  hasApiKey?: boolean
+  /** Ephemeral retrospective for the currently selected ply (if requested). */
+  retrospective?: RetrospectiveState
+  /** Request a fresh retrospective coaching message for the given ply. */
+  onRequestRetrospective?: (ply: number) => void
 }
 
 function uciToSan(fen: string, uci: string): string {
@@ -31,7 +42,14 @@ function uciToSan(fen: string, uci: string): string {
   }
 }
 
-export function MoveDetails({ game, move, selectedPly }: MoveDetailsProps) {
+export function MoveDetails({
+  game,
+  move,
+  selectedPly,
+  hasApiKey,
+  retrospective,
+  onRequestRetrospective,
+}: MoveDetailsProps) {
   const navigate = useNavigate()
   const { hasKey } = useApiKey()
   const [triggered, setTriggered] = useState(false)
@@ -193,6 +211,52 @@ export function MoveDetails({ game, move, selectedPly }: MoveDetailsProps) {
         </div>
       )}
 
+      {/* Retrospective coaching (ephemeral; lives only for this view) */}
+      {(() => {
+        const hasPersisted = (move.coach_messages?.length ?? 0) > 0
+        // Don't show empty-state if persisted messages already render below.
+        if (hasPersisted && !retrospective) return null
+        if (retrospective?.loading) {
+          return (
+            <div className="rounded-md border border-dashed p-3 text-sm text-muted-foreground flex items-center gap-2">
+              <span
+                className="inline-block w-3 h-3 rounded-full border-2 border-muted-foreground/40 border-t-primary animate-spin"
+                aria-hidden="true"
+              />
+              Loading…
+            </div>
+          )
+        }
+        if (retrospective && !retrospective.loading) {
+          return (
+            <div className="rounded-md border border-dashed p-3 text-sm leading-relaxed">
+              <RetrospectiveText text={retrospective.text} />
+            </div>
+          )
+        }
+        if (!hasPersisted && onRequestRetrospective) {
+          return (
+            <div className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">
+              No coaching recorded.
+              {hasApiKey ? (
+                <button
+                  type="button"
+                  onClick={() => onRequestRetrospective(move.ply)}
+                  className="ml-2 text-primary underline-offset-2 hover:underline"
+                >
+                  Get coaching for this position
+                </button>
+              ) : (
+                <span className="ml-2 italic">
+                  Add an API key to request coaching.
+                </span>
+              )}
+            </div>
+          )
+        }
+        return null
+      })()}
+
       {/* Action buttons */}
       <div className="flex gap-2 pt-1 flex-wrap">
         <Button
@@ -238,5 +302,33 @@ export function MoveDetails({ game, move, selectedPly }: MoveDetailsProps) {
         </div>
       )}
     </div>
+  )
+}
+
+/** Sentence-by-sentence fade-in for retrospective coaching text. */
+function RetrospectiveText({ text }: { text: string }) {
+  const sentences = text
+    .split(/(?<=\.) +/)
+    .filter((s) => s.trim().length > 0)
+  if (sentences.length === 0) {
+    return <span>{text || '…'}</span>
+  }
+  return (
+    <>
+      {sentences.map((s, i) => (
+        <span
+          key={i}
+          style={{
+            animation: 'cc-fade-in 200ms ease-out forwards',
+            animationDelay: `${i * 100}ms`,
+            opacity: 0,
+            display: 'inline',
+          }}
+        >
+          {s}
+          {i < sentences.length - 1 ? ' ' : ''}
+        </span>
+      ))}
+    </>
   )
 }
