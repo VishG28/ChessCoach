@@ -5,6 +5,7 @@ import type {
 } from '@/coaching/threats'
 import type { BlunderAlert } from '@/coaching/useCoach'
 import type { UseExplainResult } from '@/coaching/useExplain'
+import type { LiveCoachMessage } from '@/coaching/useDeepCoach'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -15,6 +16,7 @@ import {
 import { Separator } from '@/components/ui/separator'
 import { cn } from '@/lib/utils'
 import { ExplainBox } from './ExplainBox'
+import { CoachMessage } from './CoachMessage'
 
 export interface CoachPanelProps {
   mode: 'off' | 'warnings' | 'full'
@@ -28,6 +30,10 @@ export interface CoachPanelProps {
   onTakeBackBlunder: () => void
   /** LLM/rule explanation result to show in the blunder card. Only used when mode === 'full'. */
   explain?: UseExplainResult
+  /** Deep coach messages to render above legacy sections. */
+  messages?: LiveCoachMessage[]
+  onTellMore?: (id: string) => void
+  onQuieter?: () => void
 }
 
 const PIECE_GLYPH: Record<PieceSymbol, string> = {
@@ -67,8 +73,12 @@ export function CoachPanel({
   onDismissAlert,
   onTakeBackBlunder,
   explain,
+  messages,
+  onTellMore,
+  onQuieter,
 }: CoachPanelProps) {
   const isOff = mode === 'off'
+  const hasMessages = messages && messages.length > 0
 
   return (
     <Card className="w-[560px]">
@@ -109,6 +119,21 @@ export function CoachPanel({
       </CardHeader>
 
       <CardContent className="space-y-4">
+        {/* Deep coach messages rendered above legacy sections */}
+        {hasMessages && (
+          <div className="space-y-3">
+            {messages!.map((msg) => (
+              <CoachMessage
+                key={msg.id}
+                message={msg}
+                onTellMore={() => onTellMore?.(msg.id)}
+                onQuieter={() => onQuieter?.()}
+              />
+            ))}
+            <Separator />
+          </div>
+        )}
+
         {isOff ? (
           <p className="text-sm text-neutral-500">
             Coaching is off.{' '}

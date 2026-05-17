@@ -1,6 +1,7 @@
 import { NavLink } from 'react-router-dom'
 import { cn } from '@/lib/utils'
 import { ApiKeyButton } from '@/components/coaching/ApiKeyButton'
+import { SessionCost } from './SessionCost'
 
 const LINKS = [
   { to: '/', label: 'Play' },
@@ -34,6 +35,7 @@ export function TopNav() {
           ))}
         </nav>
         <div className="flex items-center gap-2">
+          <SessionCost />
           <ApiKeyButton />
         </div>
       </div>
