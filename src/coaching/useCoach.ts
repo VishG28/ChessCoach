@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Chess, type Color } from 'chess.js'
 import { toast } from 'sonner'
 import type { Engine } from '@/engine/engine'
-import type { EngineEval } from '@/engine/types'
+import type { LiveEval } from '@/engine/types'
 import type { UseChessGameResult } from '@/lib/useChessGame'
 import { cpLoss, isBlunder } from './blunder'
 import {
@@ -47,7 +47,7 @@ export interface UseCoachResult {
   captures: AvailableCapture[]
   blunderAlert: BlunderAlert | null
   /** Latest eval of the current position (for the eval bar). `null` until first eval lands. */
-  liveEval: EngineEval | null
+  liveEval: LiveEval | null
   /** True when an after-move eval is in flight. */
   thinking: boolean
   /** Clears the current blunder alert (call after the user dismisses or takes back). */
@@ -63,11 +63,11 @@ export function useCoach(opts: UseCoachOptions): UseCoachResult {
   const [threats, setThreats] = useState<ThreatenedPiece[]>([])
   const [captures, setCaptures] = useState<AvailableCapture[]>([])
   const [blunderAlert, setBlunderAlert] = useState<BlunderAlert | null>(null)
-  const [liveEval, setLiveEval] = useState<EngineEval | null>(null)
+  const [liveEval, setLiveEval] = useState<LiveEval | null>(null)
   const [thinking, setThinking] = useState(false)
 
-  // In-memory FEN -> EngineEval cache; survives re-renders via ref.
-  const evalCacheRef = useRef<Map<string, EngineEval>>(new Map())
+  // In-memory FEN -> LiveEval cache; survives re-renders via ref.
+  const evalCacheRef = useRef<Map<string, LiveEval>>(new Map())
   // Track last toasted blunder san+loss so we don't fire twice for the same alert.
   const lastToastedAlertRef = useRef<string | null>(null)
 
@@ -112,13 +112,21 @@ export function useCoach(opts: UseCoachOptions): UseCoachResult {
 
     const cache = evalCacheRef.current
 
-    const fetchEval = async (fen: string): Promise<EngineEval | null> => {
+    const fetchEval = async (fen: string): Promise<LiveEval | null> => {
       const cached = cache.get(fen)
       if (cached) return cached
       try {
-        const result = await engine.requestEval(fen, evalDepth)
-        cache.set(fen, result)
-        return result
+        const result = await engine.requestAnalysis({ fen, depth: 12, multipv: 5 })
+        const live: LiveEval = {
+          cp: result.eval.cp,
+          bestMove: result.eval.bestMove,
+          pv: result.eval.pv,
+          depth: result.eval.depth,
+          ...(result.eval.mateIn !== undefined ? { mateIn: result.eval.mateIn } : {}),
+          candidates: result.candidates.slice(0, 5),
+        }
+        cache.set(fen, live)
+        return live
       } catch {
         return null
       }

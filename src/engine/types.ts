@@ -49,6 +49,16 @@ export interface EngineEval {
   mateIn?: number
 }
 
+export interface LiveEval {
+  cp: number
+  bestMove: string
+  pv: string[]
+  depth: number
+  mateIn?: number
+  /** Sorted best→worst, length 1–5 */
+  candidates: TopCandidate[]
+}
+
 export type StrengthMode = 'uci_elo' | 'skill_level'
 
 export interface StrengthSetting {
