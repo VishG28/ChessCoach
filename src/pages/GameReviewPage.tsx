@@ -15,7 +15,7 @@ import { downloadPgn } from '@/lib/pgn'
 import { CoachMessage } from '@/components/coaching/CoachMessage'
 import { useDeepCoach } from '@/coaching/useDeepCoach'
 import type { LiveCoachMessage } from '@/coaching/useDeepCoach'
-import type { PreMoveContext } from '@/coaching/deepCoach'
+import type { CandidateLine, PreMoveContext } from '@/coaching/deepCoach'
 import { useApiKey } from '@/coaching/apiKey'
 import { useShortcut } from '@/lib/shortcuts'
 
@@ -221,13 +221,17 @@ export function GameReviewPage() {
       }
     } catch { /* ignore */ }
 
+    const candidates: CandidateLine[] = bestMoveSan
+      ? [{ san: bestMoveSan, cp: evalBefore?.cp ?? 0, pvSan }]
+      : []
+
     const preMoveCtx: PreMoveContext = {
       fen: fenBefore,
       recentMovesSan: game.moves.slice(Math.max(0, selectedPly - 8), selectedPly).map((m) => m.san),
       color: selectedMove.side === 'w' ? 'white' : 'black',
       bestMoveSan: bestMoveSan || '(unknown)',
       bestEvalCp: evalBefore?.cp ?? 0,
-      candidatesSan: bestMoveSan ? [{ san: bestMoveSan, cp: evalBefore?.cp ?? 0 }] : [],
+      candidates,
       pvSan,
       materialSummary: 'even',
       userElo: game.engineElo,

@@ -21,8 +21,8 @@ import { useEngine, parseUciMove } from '@/engine/engine'
 import { useChessGame } from '@/lib/useChessGame'
 import { getWeakeningParams, humanThinkDelay, selectMove } from '@/engine/weakening'
 import { useGameLogger } from '@/games/useGameLogger'
-import { useDeepCoach, type LiveCoachMessage } from '@/coaching/useDeepCoach'
-import type { CoachingStyle, PreMoveContext } from '@/coaching/deepCoach'
+import { useDeepCoach, uciPvToSan, uciToSan, type LiveCoachMessage } from '@/coaching/useDeepCoach'
+import type { CandidateLine, CoachingStyle, PreMoveContext } from '@/coaching/deepCoach'
 import { useShortcut } from '@/lib/shortcuts'
 
 /** Convert a UCI move to SAN given a FEN. Returns UCI string unchanged on failure. */
@@ -213,13 +213,19 @@ export function PlayPage() {
       }
     } catch { /* ignore */ }
 
+    const candidates: CandidateLine[] = (liveEval.candidates ?? []).slice(0, 5).map((c) => ({
+      san: uciToSan(game.fen, c.move),
+      cp: c.cp,
+      pvSan: uciPvToSan(game.fen, c.pv, 6),
+    }))
+
     const ctx: PreMoveContext = {
       fen: game.fen,
       recentMovesSan,
       color: userColor === 'w' ? 'white' : 'black',
       bestMoveSan,
       bestEvalCp: liveEval.cp,
-      candidatesSan: [{ san: bestMoveSan, cp: liveEval.cp }],
+      candidates: candidates.length > 0 ? candidates : [{ san: bestMoveSan, cp: liveEval.cp, pvSan }],
       pvSan,
       materialSummary: 'even',
       userElo: elo,

@@ -1,5 +1,6 @@
 // src/coaching/useDeepCoach.ts
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { Chess, type Square } from 'chess.js'
 import {
   type CoachingStyle,
   type PreMoveContext,
@@ -10,6 +11,34 @@ import {
 } from './deepCoach'
 import { useApiKey } from './apiKey'
 import { useCostCounter } from './costCounter'
+
+/** Convert a UCI principal variation to SAN, stopping if any move is illegal. */
+export function uciPvToSan(fen: string, pvUci: string[], maxPlies = 6): string[] {
+  const c = new Chess(fen)
+  const out: string[] = []
+  for (const uci of pvUci.slice(0, maxPlies)) {
+    const from = uci.slice(0, 2) as Square
+    const to = uci.slice(2, 4) as Square
+    const promotion = uci.length >= 5 ? (uci[4] as 'q' | 'r' | 'b' | 'n') : undefined
+    const move = c.move({ from, to, promotion })
+    if (!move) break
+    out.push(move.san)
+  }
+  return out
+}
+
+/** Convert a single UCI move to SAN at the given FEN, falling back to UCI on error. */
+export function uciToSan(fen: string, uci: string): string {
+  try {
+    const c = new Chess(fen)
+    const from = uci.slice(0, 2) as Square
+    const to = uci.slice(2, 4) as Square
+    const promotion = uci.length >= 5 ? (uci[4] as 'q' | 'r' | 'b' | 'n') : undefined
+    return c.move({ from, to, promotion })?.san ?? uci
+  } catch {
+    return uci
+  }
+}
 
 const DEBOUNCE_MS = 800
 const GLOBAL_RATE_MS = 3000

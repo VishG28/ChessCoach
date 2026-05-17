@@ -55,13 +55,20 @@ export function systemPromptForStyle(style: CoachingStyle): string {
   }
 }
 
+export interface CandidateLine {
+  san: string
+  cp: number
+  /** First 6 plies of principal variation in SAN. */
+  pvSan: string[]
+}
+
 export interface PreMoveContext {
   fen: string
   recentMovesSan: string[]   // last 8 plies
   color: 'white' | 'black'
   bestMoveSan: string
   bestEvalCp: number
-  candidatesSan: Array<{ san: string; cp: number }> // top 5
+  candidates: CandidateLine[]   // up to 5
   pvSan: string[]            // engine's projected continuation
   materialSummary: string    // e.g. "even" / "+2 for white"
   userElo: number
@@ -80,21 +87,18 @@ export interface PostMoveContext {
 }
 
 export function renderPreMovePrompt(ctx: PreMoveContext): string {
-  return [
+  const lines = [
     `Position: ${ctx.fen}`,
     `Recent moves: ${ctx.recentMovesSan.join(' ')}`,
-    `I'm playing as ${ctx.color}, it's my turn.`,
+    `Playing as ${ctx.color}, my turn.`,
+    `Material: ${ctx.materialSummary}. Elo: ${ctx.userElo}.`,
     ``,
-    `Engine analysis at depth 14:`,
-    `- Best move: ${ctx.bestMoveSan} (eval ${ctx.bestEvalCp}cp)`,
-    `- Top 5 candidates: ${ctx.candidatesSan.map((c) => `${c.san} (${c.cp}cp)`).join(', ')}`,
-    `- Engine's planned continuation: ${ctx.pvSan.join(' ')}`,
-    ``,
-    `Material balance: ${ctx.materialSummary}`,
-    `My Elo: ${ctx.userElo}`,
-    ``,
-    `Coach me through this position using the 5-layer structure. What's happening, what should I be looking at, what might happen, what hidden patterns matter here, and what obscure but useful advice applies?`,
-  ].join('\n')
+    `Top engine candidates:`,
+  ]
+  ctx.candidates.forEach((c, i) => {
+    lines.push(`${i + 1}. ${c.san} (${c.cp}cp) — line: ${c.pvSan.join(' ')}`)
+  })
+  return lines.join('\n')
 }
 
 export function renderPostMovePrompt(ctx: PostMoveContext): string {
