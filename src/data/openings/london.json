@@ -1,0 +1,193 @@
+{
+  "id": "london",
+  "title": "London System",
+  "userColor": "white",
+  "startFen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+  "description": "The London System is a solid, low-risk opening for White. You build a sturdy pawn structure with d4, Nf3, and Bf4, then add e3 and c3. It's great for beginners because the plan is always clear: develop safely and avoid early traps.",
+  "root": {
+    "id": "london:root",
+    "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+    "san": "",
+    "uci": "",
+    "explanation": "Starting position. White plays the London System.",
+    "children": [
+      {
+        "id": "london:1d4",
+        "fen": "rnbqkbnr/pppppppp/8/8/3P4/8/PPP1PPPP/RNBQKBNR b KQkq - 0 1",
+        "san": "d4",
+        "uci": "d2d4",
+        "explanation": "The London System starts with d4, claiming a central square and freeing the bishop on c1. This is your first move as White.",
+        "children": [
+          {
+            "id": "london:1d4-d5",
+            "fen": "rnbqkbnr/ppp1pppp/8/3p4/3P4/8/PPP1PPPP/RNBQKBNR w KQkq - 0 2",
+            "san": "d5",
+            "uci": "d7d5",
+            "explanation": "Black contests the center with the natural d5 — the main mainline response.",
+            "children": [
+              {
+                "id": "london:1d4-d5-2Nf3",
+                "fen": "rnbqkbnr/ppp1pppp/8/3p4/3P4/5N2/PPP1PPPP/RNBQKB1R b KQkq - 1 2",
+                "san": "Nf3",
+                "uci": "g1f3",
+                "explanation": "Develop the knight to f3, supporting the center. This knight helps control e5 and d4.",
+                "children": [
+                  {
+                    "id": "london:1d4-d5-2Nf3-Nf6",
+                    "fen": "rnbqkb1r/ppp1pppp/5n2/3p4/3P4/5N2/PPP1PPPP/RNBQKB1R w KQkq - 2 3",
+                    "san": "Nf6",
+                    "uci": "g8f6",
+                    "explanation": "Black develops a knight, attacks no White piece directly, and prepares ...e6 or ...c5.",
+                    "children": [
+                      {
+                        "id": "london:1d4-d5-2Nf3-Nf6-3Bf4",
+                        "fen": "rnbqkb1r/ppp1pppp/5n2/3p4/3P1B2/5N2/PPP1PPPP/RN1QKB1R b KQkq - 3 3",
+                        "san": "Bf4",
+                        "uci": "c1f4",
+                        "explanation": "Develop the bishop OUTSIDE the pawn chain before locking it in with e3. This is a key London System idea — get the bishop active first!",
+                        "children": [
+                          {
+                            "id": "london:1d4-d5-2Nf3-Nf6-3Bf4-c5",
+                            "fen": "rnbqkb1r/pp2pppp/5n2/2pp4/3P1B2/5N2/PPP1PPPP/RN1QKB1R w KQkq - 0 4",
+                            "san": "c5",
+                            "uci": "c7c5",
+                            "explanation": "Black challenges the center with c5, a natural counterattack. White should not panic — our structure handles this well.",
+                            "children": [
+                              {
+                                "id": "london:1d4-d5-2Nf3-Nf6-3Bf4-c5-4e3",
+                                "fen": "rnbqkb1r/pp2pppp/5n2/2pp4/3P1B2/4PN2/PPP2PPP/RN1QKB1R b KQkq - 0 4",
+                                "san": "e3",
+                                "uci": "e2e3",
+                                "explanation": "Solid pawn structure: the bishop on f4 is now well-placed, and we keep options to develop the b1 knight to d2 or c3.",
+                                "children": [
+                                  {
+                                    "id": "london:1d4-d5-2Nf3-Nf6-3Bf4-c5-4e3-Nc6",
+                                    "fen": "r1bqkb1r/pp2pppp/2n2n2/2pp4/3P1B2/4PN2/PPP2PPP/RN1QKB1R w KQkq - 1 5",
+                                    "san": "Nc6",
+                                    "uci": "b8c6",
+                                    "explanation": "Black develops another piece, putting pressure on d4. White's solid structure keeps everything under control.",
+                                    "children": [
+                                      {
+                                        "id": "london:1d4-d5-2Nf3-Nf6-3Bf4-c5-4e3-Nc6-5c3",
+                                        "fen": "r1bqkb1r/pp2pppp/2n2n2/2pp4/3P1B2/2P1PN2/PP3PPP/RN1QKB1R b KQkq - 0 5",
+                                        "san": "c3",
+                                        "uci": "c2c3",
+                                        "explanation": "Locking in the pawn structure. Notice we've developed two pieces, controlled the center, and prepared piece development without overextending. Main line complete!",
+                                        "children": []
+                                      }
+                                    ]
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "id": "london:1d4-d5-2Nf3-e6",
+                    "fen": "rnbqkbnr/ppp2ppp/4p3/3p4/3P4/5N2/PPP1PPPP/RNBQKB1R w KQkq - 0 3",
+                    "san": "e6",
+                    "uci": "e7e6",
+                    "explanation": "Black plays e6, a solid move that prepares to develop the dark-squared bishop. This is another common response.",
+                    "children": [
+                      {
+                        "id": "london:1d4-d5-2Nf3-e6-3Bf4",
+                        "fen": "rnbqkbnr/ppp2ppp/4p3/3p4/3P1B2/5N2/PPP1PPPP/RN1QKB1R b KQkq - 1 3",
+                        "san": "Bf4",
+                        "uci": "c1f4",
+                        "explanation": "Same London plan: bishop comes out before e3 locks it in. Notice how the move order doesn't change our strategy.",
+                        "children": [
+                          {
+                            "id": "london:1d4-d5-2Nf3-e6-3Bf4-Nf6",
+                            "fen": "rnbqkb1r/ppp2ppp/4pn2/3p4/3P1B2/5N2/PPP1PPPP/RN1QKB1R w KQkq - 2 4",
+                            "san": "Nf6",
+                            "uci": "g8f6",
+                            "explanation": "Black develops the kingside knight. Both sides are following natural development.",
+                            "children": [
+                              {
+                                "id": "london:1d4-d5-2Nf3-e6-3Bf4-Nf6-4e3",
+                                "fen": "rnbqkb1r/ppp2ppp/4pn2/3p4/3P1B2/4PN2/PPP2PPP/RN1QKB1R b KQkq - 0 4",
+                                "san": "e3",
+                                "uci": "e2e3",
+                                "explanation": "Now we play e3, locking in the bishop on f4 but creating a very solid pawn chain. The bishop was out first — that's the key.",
+                                "children": [
+                                  {
+                                    "id": "london:1d4-d5-2Nf3-e6-3Bf4-Nf6-4e3-c5",
+                                    "fen": "rnbqkb1r/pp3ppp/4pn2/2pp4/3P1B2/4PN2/PPP2PPP/RN1QKB1R w KQkq - 0 5",
+                                    "san": "c5",
+                                    "uci": "c7c5",
+                                    "explanation": "Black challenges with c5. This is typical counterplay in the London — we stay calm and keep our structure.",
+                                    "children": [
+                                      {
+                                        "id": "london:1d4-d5-2Nf3-e6-3Bf4-Nf6-4e3-c5-5c3",
+                                        "fen": "rnbqkb1r/pp3ppp/4pn2/2pp4/3P1B2/2P1PN2/PP3PPP/RN1QKB1R b KQkq - 0 5",
+                                        "san": "c3",
+                                        "uci": "c2c3",
+                                        "explanation": "c3 completes our solid pawn triangle. We have d4, e3, and c3 — a classic London fortress. Line complete!",
+                                        "children": []
+                                      }
+                                    ]
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "id": "london:1d4-d5-2Nf3-Nc6",
+                    "fen": "r1bqkbnr/ppp1pppp/2n5/3p4/3P4/5N2/PPP1PPPP/RNBQKB1R w KQkq - 2 3",
+                    "san": "Nc6",
+                    "uci": "b8c6",
+                    "explanation": "Black develops the queenside knight (Chigorin-style). This isn't the most common move but is perfectly playable.",
+                    "children": [
+                      {
+                        "id": "london:1d4-d5-2Nf3-Nc6-3Bf4",
+                        "fen": "r1bqkbnr/ppp1pppp/2n5/3p4/3P1B2/5N2/PPP1PPPP/RN1QKB1R b KQkq - 3 3",
+                        "san": "Bf4",
+                        "uci": "c1f4",
+                        "explanation": "We still develop the bishop first — same London plan regardless of what Black does.",
+                        "children": [
+                          {
+                            "id": "london:1d4-d5-2Nf3-Nc6-3Bf4-Bg4",
+                            "fen": "r2qkbnr/ppp1pppp/2n5/3p4/3P1Bb1/5N2/PPP1PPPP/RN1QKB1R w KQkq - 4 4",
+                            "san": "Bg4",
+                            "uci": "c8g4",
+                            "explanation": "Black pins your knight with Bg4. Don't panic — this pin is not immediately dangerous.",
+                            "children": [
+                              {
+                                "id": "london:1d4-d5-2Nf3-Nc6-3Bf4-Bg4-4e3",
+                                "fen": "r2qkbnr/ppp1pppp/2n5/3p4/3P1Bb1/4PN2/PPP2PPP/RN1QKB1R b KQkq - 0 4",
+                                "san": "e3",
+                                "uci": "e2e3",
+                                "explanation": "e3 breaks the pin! The bishop on g4 has no good retreat. This is why e3 is such a useful move in the London.",
+                                "children": [
+                                  {
+                                    "id": "london:1d4-d5-2Nf3-Nc6-3Bf4-Bg4-4e3-e6",
+                                    "fen": "r2qkbnr/ppp2ppp/2n1p3/3p4/3P1Bb1/4PN2/PPP2PPP/RN1QKB1R w KQkq - 0 5",
+                                    "san": "e6",
+                                    "uci": "e7e6",
+                                    "explanation": "Black plays e6 to give the bishop a retreat square. The position is solid for White. Line complete!",
+                                    "children": []
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
