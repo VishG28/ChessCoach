@@ -3,6 +3,8 @@ import { Chess } from 'chess.js'
 import type { Color, Square } from 'chess.js'
 import { useLocation } from 'react-router-dom'
 import { Board } from '@/components/board/Board'
+import { CapturedPieces } from '@/components/board/CapturedPieces'
+import { BoardActionBar } from '@/components/board/BoardActionBar'
 import { CoachPanel } from '@/components/coaching/CoachPanel'
 import {
   LeftSidebar,
@@ -406,27 +408,31 @@ export function PlayPage() {
   const activePly = game.history.length - 1
 
   return (
-    <div className="flex flex-col px-6 py-8">
-      {/* API key banner removed — top-bar ApiKeyButton handles the CTA. */}
-      <div className="flex gap-6 w-full max-w-[1180px] mx-auto">
-        <aside className="w-64 shrink-0">
-          <LeftSidebar
-            elo={elo}
-            onEloChange={setElo}
-            color={colorChoice}
-            onColorChange={setColorChoice}
-            coachMode={coachMode}
-            onCoachModeChange={setCoachMode}
-            onNewGame={handleNewGame}
-            onTakeBack={handleTakeBack}
-            canTakeBack={game.history.length > 0}
-            engineStatus={ready ? 'ready' : 'loading'}
-            coachingStyle={coachingStyle}
-            onCoachingStyleChange={setCoachingStyle}
-          />
-        </aside>
+    <div className="mx-auto grid w-full max-w-[1280px] grid-cols-1 gap-6 px-6 py-8 md:grid-cols-[280px_1fr_320px]">
+      <aside className="space-y-4 md:sticky md:top-20 md:self-start">
+        <LeftSidebar
+          elo={elo}
+          onEloChange={setElo}
+          color={colorChoice}
+          onColorChange={setColorChoice}
+          coachMode={coachMode}
+          onCoachModeChange={setCoachMode}
+          onNewGame={handleNewGame}
+          onTakeBack={handleTakeBack}
+          canTakeBack={game.history.length > 0}
+          engineStatus={ready ? 'ready' : 'loading'}
+          coachingStyle={coachingStyle}
+          onCoachingStyleChange={setCoachingStyle}
+        />
+      </aside>
 
-        <main className="flex-1 flex flex-col items-center gap-4">
+      <main className="flex flex-col items-center gap-4">
+        <CapturedPieces
+          history={game.history}
+          side="opponent"
+          userColor={userColor === 'w' ? 'white' : 'black'}
+        />
+        <div className="rounded-lg bg-card p-3 shadow-lg">
           <Board
             fen={game.fen}
             orientation={game.orientation}
@@ -437,31 +443,39 @@ export function PlayPage() {
             inCheck={game.inCheck}
             onUserMove={handleUserMove}
           />
-          <CoachPanel
-            mode={coachMode}
-            threats={coach.threats}
-            captures={coach.captures}
-            blunderAlert={coach.blunderAlert}
-            thinking={coach.thinking}
-            engineThinking={engineThinking}
-            onDismissAlert={coach.dismissAlert}
-            onTakeBackBlunder={handleTakeBack}
-            explain={explain}
-            messages={deepCoach.messages}
-            onTellMore={handleTellMore}
-            onQuieter={handleQuieter}
-          />
-        </main>
+        </div>
+        <BoardActionBar
+          onFlip={() => game.setOrientation(game.orientation === 'white' ? 'black' : 'white')}
+        />
+        <CapturedPieces
+          history={game.history}
+          side="user"
+          userColor={userColor === 'w' ? 'white' : 'black'}
+        />
+        <CoachPanel
+          mode={coachMode}
+          threats={coach.threats}
+          captures={coach.captures}
+          blunderAlert={coach.blunderAlert}
+          thinking={coach.thinking}
+          engineThinking={engineThinking}
+          onDismissAlert={coach.dismissAlert}
+          onTakeBackBlunder={handleTakeBack}
+          explain={explain}
+          messages={deepCoach.messages}
+          onTellMore={handleTellMore}
+          onQuieter={handleQuieter}
+        />
+      </main>
 
-        <aside className="w-72 shrink-0">
-          <RightSidebar
-            history={game.history}
-            evalCpWhitePov={evalCpWhitePov}
-            mateIn={mateInWhitePov}
-            activePly={activePly >= 0 ? activePly : null}
-          />
-        </aside>
-      </div>
+      <aside className="space-y-4 md:sticky md:top-20 md:self-start">
+        <RightSidebar
+          history={game.history}
+          evalCpWhitePov={evalCpWhitePov}
+          mateIn={mateInWhitePov}
+          activePly={activePly >= 0 ? activePly : null}
+        />
+      </aside>
 
       {debugOpen && engine && <DebugOverlay engine={engine} elo={elo} />}
     </div>
