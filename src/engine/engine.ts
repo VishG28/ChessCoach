@@ -9,7 +9,7 @@ import {
   useMultiPV,
 } from './eloCurves'
 
-const WORKER_URL = '/engine/stockfish-18-lite-single.js'
+const WORKER_URL = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/engine/stockfish-18-lite-single.js`
 const ELO_MAX_UCI = 3190
 const MATE_SCORE = 100000
 const RECENT_MOVES_MAX = 5
