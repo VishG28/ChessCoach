@@ -202,7 +202,7 @@ function BeforeMoveSection({
 
 function ThreatsList({ threats }: { threats: ThreatenedPiece[] }) {
   return (
-    <div className="rounded-md border border-red-200 bg-red-50/40 p-3">
+    <div className="rounded-md border border-red-200 bg-red-50/40 p-3 border-l-4 border-l-amber-400">
       <div className="mb-2 text-[0.65rem] font-semibold uppercase tracking-wider text-red-700">
         Threats
       </div>
@@ -243,7 +243,7 @@ function ThreatsList({ threats }: { threats: ThreatenedPiece[] }) {
 
 function CapturesList({ captures }: { captures: AvailableCapture[] }) {
   return (
-    <div className="rounded-md border border-emerald-200 bg-emerald-50/40 p-3">
+    <div className="rounded-md border border-emerald-200 bg-emerald-50/40 p-3 border-l-4 border-l-emerald-500">
       <div className="mb-2 text-[0.65rem] font-semibold uppercase tracking-wider text-emerald-700">
         Captures
       </div>
@@ -306,7 +306,7 @@ function AfterMoveSection({
   return (
     <section className="space-y-2">
       <span className={SECTION_LABEL}>After your move</span>
-      <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 shadow-sm">
+      <div className="rounded-lg border border-red-300 bg-amber-50 p-4 shadow-sm border-l-4 border-l-red-500">
         <div className="space-y-1">
           <div className="flex items-baseline gap-2">
             <span className="rounded bg-amber-200/70 px-1.5 py-0.5 font-mono text-sm font-semibold text-amber-900">
@@ -323,13 +323,21 @@ function AfterMoveSection({
         </div>
         {mode === 'full' && explain && (
           <div className="mt-3">
-            <ExplainBox
-              text={explain.text}
-              source={explain.source}
-              loading={explain.loading}
-              error={explain.error}
-              onRegenerate={explain.regenerate}
-            />
+            {explain.loading ? (
+              <div className="animate-pulse space-y-2" aria-label="Loading explanation">
+                <div className="h-3 w-3/4 rounded bg-amber-200/70" />
+                <div className="h-3 w-full rounded bg-amber-200/70" />
+                <div className="h-3 w-2/3 rounded bg-amber-200/70" />
+              </div>
+            ) : (
+              <ExplainBox
+                text={explain.text}
+                source={explain.source}
+                loading={explain.loading}
+                error={explain.error}
+                onRegenerate={explain.regenerate}
+              />
+            )}
           </div>
         )}
         <div className="mt-3 flex gap-2">
