@@ -41,6 +41,19 @@ export function RatingHelpModal({ open, onOpenChange }: RatingHelpModalProps) {
             The slider should land where you win roughly <strong>30&ndash;40%</strong> of
             games against the bot.
           </p>
+          <p>
+            <strong>1100</strong> is the floor (Maia&rsquo;s lowest model). For
+            sub-1100 play, use{' '}
+            <a
+              href="https://lichess.org"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary underline underline-offset-2"
+            >
+              Lichess
+            </a>
+            .
+          </p>
         </div>
       </DialogContent>
     </Dialog>

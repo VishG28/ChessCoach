@@ -11,8 +11,9 @@
  *   3. Stockfish best move at calibrated depth when the resolved source is
  *      Stockfish (or as fallback when Maia load/predict fails).
  *
- * The Phase 3A weakening rolls (random/blunder injection) have been removed —
- * Stockfish above 1900 is trusted to deliver the rated strength via UCI.
+ * The Phase 3A handicap rolls (random and tactical-error injection) have been
+ * removed — Stockfish above 1900 is trusted to deliver the rated strength via
+ * UCI.
  */
 
 import { getBookMove } from './openingBook'

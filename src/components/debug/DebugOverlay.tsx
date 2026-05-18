@@ -3,6 +3,7 @@ import { Card } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import type { Engine } from '@/engine/engine'
 import type { EngineDebugState } from '@/engine/types'
+import { resolveEngine } from '@/engine/engineRouting'
 
 interface DebugOverlayProps {
   engine: Engine
@@ -16,11 +17,15 @@ export function DebugOverlay({ engine, elo }: DebugOverlayProps) {
     return engine.onDebug(setState)
   }, [engine])
 
+  const resolved = resolveEngine(elo)
+  const isStockfish = resolved.source === 'stockfish'
+
   return (
     <Card className="fixed bottom-4 right-4 z-50 w-80 p-3 font-mono text-xs bg-card text-card-foreground border-border shadow-xl">
       <div className="font-semibold mb-2">Engine Debug (press ` to close)</div>
       <div>Elo (slider): {elo}</div>
-      <div>Skill Level: {state.skill}</div>
+      <div>Active engine: {resolved.modelLabel}</div>
+      {isStockfish && <div>UCI Skill (Stockfish only): {state.skill}</div>}
       <div>Depth: {state.depth}</div>
       <div>Movetime: {state.movetime}ms</div>
       <div>MultiPV: {state.multipv}</div>
