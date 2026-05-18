@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Separator } from '@/components/ui/separator'
 import { Slider } from '@/components/ui/slider'
+import { Switch } from '@/components/ui/switch'
 import { cn } from '@/lib/utils'
 import type { CoachingStyle } from '@/coaching/deepCoach'
 
@@ -28,6 +29,8 @@ export interface LeftSidebarProps {
   engineStatus: 'loading' | 'ready'
   coachingStyle?: CoachingStyle
   onCoachingStyleChange?: (s: CoachingStyle) => void
+  allowPremoves?: boolean
+  onAllowPremovesChange?: (v: boolean) => void
 }
 
 const COACH_MODES: ReadonlyArray<{ value: CoachMode; label: string }> = [
@@ -58,9 +61,12 @@ export function LeftSidebar({
   engineStatus,
   coachingStyle,
   onCoachingStyleChange,
+  allowPremoves,
+  onAllowPremovesChange,
 }: LeftSidebarProps) {
   const ready = engineStatus === 'ready'
   const styleDisabled = coachMode !== 'full'
+  const premovesDisabled = coachMode === 'full'
 
   return (
     <Card className="w-full">
@@ -173,13 +179,46 @@ export function LeftSidebar({
           </section>
         )}
 
+        {onAllowPremovesChange !== undefined && (
+          <section className="space-y-2">
+            <span className={SECTION_LABEL}>Premoves</span>
+            <div className="flex items-center gap-3">
+              <Switch
+                id="allow-premoves"
+                checked={!!allowPremoves}
+                onCheckedChange={onAllowPremovesChange}
+                disabled={premovesDisabled}
+                size="sm"
+              />
+              <Label
+                htmlFor="allow-premoves"
+                className={cn(
+                  'cursor-pointer text-sm',
+                  premovesDisabled && 'cursor-not-allowed opacity-50',
+                )}
+              >
+                Allow premoves
+              </Label>
+            </div>
+            {premovesDisabled ? (
+              <p className="text-xs text-warning">
+                Disabled while coach mode is &ldquo;full&rdquo; — pre-move coaching needs your full turn.
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Click during opponent&rsquo;s turn to queue your next move.
+              </p>
+            )}
+          </section>
+        )}
+
         <Separator />
 
         <section className="space-y-2">
           <Button
             type="button"
             onClick={onNewGame}
-            className="w-full"
+            className="w-full transition-transform duration-150 hover:scale-[1.02]"
             size="lg"
           >
             New Game

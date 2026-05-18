@@ -30,6 +30,7 @@ import { useShortcut } from '@/lib/shortcuts'
 import type { MoveSourceInfo } from '@/components/sidebar/RightSidebar'
 import { requestOpponentMove, type OpponentMode } from '@/engine/opponentEngine'
 import { loadMaiaModel, maiaModelName, selectMaiaModel } from '@/engine/maia'
+import { useAllowPremoves, usePremoveQueue, premoveStillLegal } from '@/lib/usePremove'
 
 /** Convert a UCI move to SAN given a FEN. Returns UCI string unchanged on failure. */
 function uciToSanLocal(fen: string, uci: string): string {
@@ -85,6 +86,24 @@ export function PlayPage() {
   const [debugOpen, setDebugOpen] = useState(false)
   const [engineThinking, setEngineThinking] = useState(false)
   const [engineMode, setEngineMode] = useState<OpponentMode>(getDefaultEngine())
+
+  // Premove support
+  const [allowPremovesPref, setAllowPremovesPref] = useAllowPremoves()
+  const { queued: queuedPremove, setPremove, cancelPremove } = usePremoveQueue()
+  const [premoveFailSquare, setPremoveFailSquare] = useState<string | null>(null)
+  // Ref so the async engine IIFE always reads the latest queued premove.
+  const queuedPremoveRef = useRef(queuedPremove)
+  queuedPremoveRef.current = queuedPremove
+  // Effective allowPremoves: disabled in full coach mode to avoid coaching conflicts.
+  const allowPremoves = allowPremovesPref && coachMode !== 'full'
+  // When coachMode transitions to 'full', clear any queued premove.
+  const prevCoachModeRef = useRef(coachMode)
+  if (prevCoachModeRef.current !== coachMode) {
+    prevCoachModeRef.current = coachMode
+    if (coachMode === 'full') {
+      cancelPremove()
+    }
+  }
 
   // Lazy-load Maia model when the user picks Maia or changes Elo bucket.
   useEffect(() => {
@@ -382,6 +401,29 @@ export function PlayPage() {
           promotion: chosen.promotion,
         })
 
+        // After the engine move lands, try to execute any queued premove.
+        const currentPremove = queuedPremoveRef.current
+        if (currentPremove) {
+          const newFen = game.fen
+          const legal = premoveStillLegal(newFen, currentPremove)
+          if (legal) {
+            // Brief visual breathing room before executing.
+            setTimeout(() => {
+              game.makeMove({
+                from: legal.from as Square,
+                to: legal.to as Square,
+                promotion: 'q',
+              })
+              cancelPremove()
+            }, 100)
+          } else {
+            // Flash the origin square red to signal the premove was illegal.
+            setPremoveFailSquare(currentPremove.from)
+            setTimeout(() => setPremoveFailSquare(null), 200)
+            cancelPremove()
+          }
+        }
+
         const lastEntry = game.history[game.history.length - 1]
         if (lastEntry && engine && result.source === 'stockfish') {
           engine.recordEngineMoveSan(chosenUci, lastEntry.san)
@@ -528,6 +570,8 @@ export function PlayPage() {
           engineStatus={ready ? 'ready' : 'loading'}
           coachingStyle={coachingStyle}
           onCoachingStyleChange={setCoachingStyle}
+          allowPremoves={allowPremovesPref}
+          onAllowPremovesChange={setAllowPremovesPref}
         />
         <div className="rounded-lg border bg-card p-4">
           <EngineSelector value={engineMode} onChange={setEngineMode} disabled={false} />
@@ -550,6 +594,10 @@ export function PlayPage() {
             lastMove={game.lastMove}
             inCheck={game.inCheck}
             onUserMove={handleUserMove}
+            allowPremoves={allowPremoves}
+            onPremoveSet={(orig, dest) => setPremove({ from: orig, to: dest })}
+            onPremoveUnset={cancelPremove}
+            premoveFailSquare={premoveFailSquare}
           />
         </div>
         <BoardActionBar

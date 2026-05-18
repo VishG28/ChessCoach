@@ -116,7 +116,7 @@ export function RightSidebar({
             aria-valuenow={Math.round(whitePct)}
           >
             <div
-              className="absolute inset-y-0 right-0 bg-white"
+              className="absolute inset-y-0 right-0 bg-white transition-all duration-300 ease-out"
               style={{ width: `${whitePct}%` }}
             />
             <div className="pointer-events-none absolute left-1/2 top-0 h-full w-px bg-muted-foreground/40" />
