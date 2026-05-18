@@ -46,6 +46,8 @@ export interface CoachPanelProps {
    */
   requestDeepDive?: (id: string) => void
   onQuieter?: () => void
+  /** Flags indicating which arrow types are currently visible on the board. */
+  coachFlags?: { hasBestArrow?: boolean; hasThreatArrow?: boolean }
 }
 
 const PIECE_GLYPH: Record<PieceSymbol, string> = {
@@ -89,6 +91,7 @@ export function CoachPanel({
   onTellMore,
   requestDeepDive,
   onQuieter,
+  coachFlags,
 }: CoachPanelProps) {
   const isOff = mode === 'off'
   const hasMessages = messages && messages.length > 0
@@ -147,7 +150,7 @@ export function CoachPanel({
               const showTellMore = isBrief && !msg.streaming && !!tellMoreHandler
               return (
                 <div key={msg.id} className="space-y-1">
-                  <CoachMessage message={msg} />
+                  <CoachMessage message={msg} flags={coachFlags} />
                   {showTellMore && (
                     <TellMoreButton onClick={() => tellMoreHandler?.(msg.id)} />
                   )}

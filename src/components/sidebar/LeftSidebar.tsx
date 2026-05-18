@@ -31,6 +31,12 @@ export interface LeftSidebarProps {
   onCoachingStyleChange?: (s: CoachingStyle) => void
   allowPremoves?: boolean
   onAllowPremovesChange?: (v: boolean) => void
+  arrowsMaster?: boolean
+  onArrowsMasterChange?: (v: boolean) => void
+  arrowsBest?: boolean
+  onArrowsBestChange?: (v: boolean) => void
+  arrowsThreats?: boolean
+  onArrowsThreatsChange?: (v: boolean) => void
 }
 
 const COACH_MODES: ReadonlyArray<{ value: CoachMode; label: string }> = [
@@ -63,6 +69,12 @@ export function LeftSidebar({
   onCoachingStyleChange,
   allowPremoves,
   onAllowPremovesChange,
+  arrowsMaster,
+  onArrowsMasterChange,
+  arrowsBest,
+  onArrowsBestChange,
+  arrowsThreats,
+  onArrowsThreatsChange,
 }: LeftSidebarProps) {
   const ready = engineStatus === 'ready'
   const styleDisabled = coachMode !== 'full'
@@ -209,6 +221,59 @@ export function LeftSidebar({
                 Click during opponent&rsquo;s turn to queue your next move.
               </p>
             )}
+          </section>
+        )}
+
+        {onArrowsMasterChange !== undefined && (
+          <section className="space-y-2">
+            <span className={SECTION_LABEL}>Board Arrows</span>
+            <div className="flex items-center gap-3">
+              <Switch
+                id="arrows-master"
+                checked={!!arrowsMaster}
+                onCheckedChange={onArrowsMasterChange}
+                size="sm"
+              />
+              <Label htmlFor="arrows-master" className="cursor-pointer text-sm">
+                Show arrows
+              </Label>
+            </div>
+            <div className={cn('space-y-2 pl-1', !arrowsMaster && 'pointer-events-none opacity-40')}>
+              {onArrowsBestChange !== undefined && (
+                <div className="flex items-center gap-3">
+                  <Switch
+                    id="arrows-best"
+                    checked={!!arrowsBest}
+                    onCheckedChange={onArrowsBestChange}
+                    disabled={!arrowsMaster}
+                    size="sm"
+                  />
+                  <Label
+                    htmlFor="arrows-best"
+                    className={cn('cursor-pointer text-sm', !arrowsMaster && 'cursor-not-allowed')}
+                  >
+                    Best move suggestion
+                  </Label>
+                </div>
+              )}
+              {onArrowsThreatsChange !== undefined && (
+                <div className="flex items-center gap-3">
+                  <Switch
+                    id="arrows-threats"
+                    checked={!!arrowsThreats}
+                    onCheckedChange={onArrowsThreatsChange}
+                    disabled={!arrowsMaster}
+                    size="sm"
+                  />
+                  <Label
+                    htmlFor="arrows-threats"
+                    className={cn('cursor-pointer text-sm', !arrowsMaster && 'cursor-not-allowed')}
+                  >
+                    Threat warnings
+                  </Label>
+                </div>
+              )}
+            </div>
           </section>
         )}
 

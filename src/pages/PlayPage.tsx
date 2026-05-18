@@ -30,7 +30,9 @@ import { useShortcut } from '@/lib/shortcuts'
 import type { MoveSourceInfo } from '@/components/sidebar/RightSidebar'
 import { requestOpponentMove, type OpponentMode } from '@/engine/opponentEngine'
 import { loadMaiaModel, maiaModelName, selectMaiaModel } from '@/engine/maia'
-import { useAllowPremoves, usePremoveQueue, premoveStillLegal } from '@/lib/usePremove'
+import { useAllowPremoves, usePremoveQueue, premoveStillLegal, useArrowsMaster, useArrowsBest, useArrowsThreats } from '@/lib/usePremove'
+import { bestMoveShape, threatShapes } from '@/components/board/BoardArrows'
+import type { DrawShape } from 'chessground/draw'
 
 /** Convert a UCI move to SAN given a FEN. Returns UCI string unchanged on failure. */
 function uciToSanLocal(fen: string, uci: string): string {
@@ -104,6 +106,11 @@ export function PlayPage() {
       cancelPremove()
     }
   }
+
+  // Arrow toggle settings (persisted to localStorage)
+  const [arrowsMaster, setArrowsMaster] = useArrowsMaster()
+  const [arrowsBest, setArrowsBest] = useArrowsBest()
+  const [arrowsThreats, setArrowsThreats] = useArrowsThreats()
 
   // Lazy-load Maia model when the user picks Maia or changes Elo bucket.
   useEffect(() => {
@@ -554,6 +561,31 @@ export function PlayPage() {
 
   const activePly = game.history.length - 1
 
+  // Compute board arrow shapes from current eval + settings.
+  const enoughMoves = game.history.length >= 4
+  const userTurn = game.turn === userColor
+  const liveEval = coach.liveEval
+  const userColorStr = userColor === 'w' ? 'white' : 'black'
+
+  const bestArrow: DrawShape | null =
+    arrowsMaster && arrowsBest && enoughMoves && userTurn && liveEval?.candidates?.[0]
+      ? bestMoveShape(liveEval.candidates[0])
+      : null
+
+  const threatArrows: DrawShape[] =
+    arrowsMaster && arrowsThreats && enoughMoves && userColor
+      ? threatShapes(game.fen, userColorStr)
+      : []
+
+  const shapes: DrawShape[] = [bestArrow, ...threatArrows].filter(
+    (s): s is DrawShape => Boolean(s),
+  )
+
+  const coachFlags = {
+    hasBestArrow: Boolean(bestArrow),
+    hasThreatArrow: threatArrows.length > 0,
+  }
+
   return (
     <div className="mx-auto grid w-full max-w-[1280px] grid-cols-1 gap-6 px-6 py-8 md:grid-cols-[280px_1fr_320px]">
       <aside className="space-y-4 md:sticky md:top-20 md:self-start">
@@ -572,6 +604,12 @@ export function PlayPage() {
           onCoachingStyleChange={setCoachingStyle}
           allowPremoves={allowPremovesPref}
           onAllowPremovesChange={setAllowPremovesPref}
+          arrowsMaster={arrowsMaster}
+          onArrowsMasterChange={setArrowsMaster}
+          arrowsBest={arrowsBest}
+          onArrowsBestChange={setArrowsBest}
+          arrowsThreats={arrowsThreats}
+          onArrowsThreatsChange={setArrowsThreats}
         />
         <div className="rounded-lg border bg-card p-4">
           <EngineSelector value={engineMode} onChange={setEngineMode} disabled={false} />
@@ -598,6 +636,7 @@ export function PlayPage() {
             onPremoveSet={(orig, dest) => setPremove({ from: orig, to: dest })}
             onPremoveUnset={cancelPremove}
             premoveFailSquare={premoveFailSquare}
+            shapes={shapes}
           />
         </div>
         <BoardActionBar
@@ -621,6 +660,7 @@ export function PlayPage() {
           messages={deepCoach.messages}
           onTellMore={handleTellMore}
           onQuieter={handleQuieter}
+          coachFlags={coachFlags}
         />
       </main>
 

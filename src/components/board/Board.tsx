@@ -4,6 +4,14 @@ import { Chessground } from 'chessground'
 import type { Api } from 'chessground/api'
 import type { Config } from 'chessground/config'
 import type { Key } from 'chessground/types'
+import type { DrawShape } from 'chessground/draw'
+
+// Inline hex colors for arrow brushes. OKLch strings are not reliably parsed
+// by the canvas 2D API that chessground uses internally, so we hardcode hex.
+// Light theme best-move green; works acceptably in dark theme too.
+const BRUSH_BEST = '#2D7A4F'
+// Threat/danger red for both themes.
+const BRUSH_THREAT = '#B83A3A'
 
 type Promotion = 'q' | 'r' | 'b' | 'n'
 
@@ -20,6 +28,8 @@ interface BoardProps {
   onPremoveSet?: (orig: string, dest: string) => void
   onPremoveUnset?: () => void
   premoveFailSquare?: string | null
+  /** Arrow shapes to overlay on the board (best-move, threat, etc.). */
+  shapes?: DrawShape[]
 }
 
 function turnToColor(turn: 'w' | 'b'): 'white' | 'black' {
@@ -57,6 +67,7 @@ export function Board({
   onPremoveSet,
   onPremoveUnset,
   premoveFailSquare,
+  shapes,
 }: BoardProps) {
   const wrapRef = useRef<HTMLDivElement | null>(null)
   const apiRef = useRef<Api | null>(null)
@@ -116,6 +127,21 @@ export function Board({
           },
         },
       },
+      drawable: {
+        enabled: true,
+        visible: true,
+        defaultSnapToValidMove: false,
+        brushes: {
+          green: { key: 'g', color: '#15781B', opacity: 1, lineWidth: 10 },
+          red: { key: 'r', color: '#882020', opacity: 1, lineWidth: 10 },
+          blue: { key: 'b', color: '#003088', opacity: 1, lineWidth: 10 },
+          yellow: { key: 'y', color: '#e68f00', opacity: 1, lineWidth: 10 },
+          'cc-best': { key: 'cb', color: BRUSH_BEST, opacity: 1, lineWidth: 12 },
+          'cc-threat': { key: 'ct', color: BRUSH_THREAT, opacity: 0.7, lineWidth: 9 },
+        },
+        shapes: shapes ?? [],
+        autoShapes: [],
+      },
     }
     apiRef.current = Chessground(wrapRef.current, initial)
 
@@ -174,8 +200,23 @@ export function Board({
           },
         },
       },
+      drawable: {
+        enabled: true,
+        visible: true,
+        defaultSnapToValidMove: false,
+        brushes: {
+          green: { key: 'g', color: '#15781B', opacity: 1, lineWidth: 10 },
+          red: { key: 'r', color: '#882020', opacity: 1, lineWidth: 10 },
+          blue: { key: 'b', color: '#003088', opacity: 1, lineWidth: 10 },
+          yellow: { key: 'y', color: '#e68f00', opacity: 1, lineWidth: 10 },
+          'cc-best': { key: 'cb', color: BRUSH_BEST, opacity: 1, lineWidth: 12 },
+          'cc-threat': { key: 'ct', color: BRUSH_THREAT, opacity: 0.7, lineWidth: 9 },
+        },
+        shapes: shapes ?? [],
+        autoShapes: [],
+      },
     })
-  }, [fen, orientation, turn, userColor, dests, lastMove, inCheck, allowPremoves])
+  }, [fen, orientation, turn, userColor, dests, lastMove, inCheck, allowPremoves, shapes])
 
   // Compute fail-square overlay position (12.5% of board per square).
   let failOverlayStyle: CSSProperties | null = null

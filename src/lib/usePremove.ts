@@ -15,6 +15,31 @@ export function useAllowPremoves(): [boolean, (b: boolean) => void] {
   return [v, setV]
 }
 
+/** Generic persisted boolean setting for arrow visibility toggles. */
+function useArrowSetting(key: string, defaultValue: boolean): [boolean, (b: boolean) => void] {
+  const [v, setV] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return defaultValue
+    const raw = window.localStorage.getItem(key)
+    return raw === null ? defaultValue : raw === 'true'
+  })
+  useEffect(() => {
+    if (typeof window !== 'undefined') window.localStorage.setItem(key, String(v))
+  }, [v])
+  return [v, setV]
+}
+
+export function useArrowsMaster(): [boolean, (b: boolean) => void] {
+  return useArrowSetting('cc.arrows.master.v1', true)
+}
+
+export function useArrowsBest(): [boolean, (b: boolean) => void] {
+  return useArrowSetting('cc.arrows.best.v1', true)
+}
+
+export function useArrowsThreats(): [boolean, (b: boolean) => void] {
+  return useArrowSetting('cc.arrows.threats.v1', true)
+}
+
 export interface QueuedPremove {
   from: string
   to: string

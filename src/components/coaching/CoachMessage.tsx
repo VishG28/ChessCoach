@@ -19,6 +19,24 @@ interface Props {
    * Accepted for back-compat; ignored.
    */
   onQuieter?: () => void
+  /** Flags indicating which arrow types are currently visible on the board. */
+  flags?: { hasBestArrow?: boolean; hasThreatArrow?: boolean }
+}
+
+function decorate(content: string, flags?: Props['flags']): string {
+  if (!flags) return content
+  return content
+    .split('\n')
+    .map((line) => {
+      if (flags.hasBestArrow && /^- \*\*Candidate/i.test(line)) {
+        return line.replace(/^- /, '- ↗ ')
+      }
+      if (flags.hasThreatArrow && /threat|attack|hanging/i.test(line) && line.startsWith('- ')) {
+        return line.replace(/^- /, '- ⚠ ')
+      }
+      return line
+    })
+    .join('\n')
 }
 
 const QUIET_LENGTH_THRESHOLD = 80
@@ -40,7 +58,8 @@ const mdComponents: ComponentProps<typeof ReactMarkdown>['components'] = {
   p: (props) => <p {...props} className="my-0" />,
 }
 
-export function CoachMessage({ message }: Props) {
+export function CoachMessage({ message, flags }: Props) {
+  const decoratedContent = decorate(message.content, flags)
   const accent =
     message.depth === 'critical'
       ? 'border-l-4 border-red-500'
@@ -48,16 +67,16 @@ export function CoachMessage({ message }: Props) {
         ? 'border-l-4 border-amber-500'
         : 'border-l-4 border-emerald-500'
 
-  const quiet = !message.streaming && isQuiet(message.content)
+  const quiet = !message.streaming && isQuiet(decoratedContent)
   const bodyClass = quiet
     ? 'italic text-muted-foreground text-sm leading-relaxed'
     : 'text-left text-base leading-relaxed prose prose-sm dark:prose-invert max-w-none'
 
-  const isList = message.content.trim().startsWith('-')
+  const isList = decoratedContent.trim().startsWith('-')
 
   const md = (
     <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
-      {message.content || '…'}
+      {decoratedContent || '…'}
     </ReactMarkdown>
   )
 
@@ -74,17 +93,17 @@ export function CoachMessage({ message }: Props) {
           {message.streaming ? (
             // Mid-stream: render markdown (not raw text) so bullets form incrementally.
             quiet ? (
-              <span>{message.content || '…'}</span>
+              <span>{decoratedContent || '…'}</span>
             ) : (
               md
             )
           ) : quiet ? (
-            <span className="italic">{message.content}</span>
+            <span className="italic">{decoratedContent}</span>
           ) : isList ? (
             // Bullet list — skip SentenceFade, render markdown directly.
             md
           ) : (
-            <SentenceFade content={message.content} />
+            <SentenceFade content={decoratedContent} />
           )}
         </div>
       </div>
