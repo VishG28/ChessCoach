@@ -8,6 +8,7 @@
     "build": "bash scripts/copy-ort.sh && tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
+    "test": "vitest run",
     "openings:generate": "tsx scripts/generateOpenings.ts",
     "openings:dummy": "tsx scripts/buildDummyOpenings.ts"
   },
@@ -52,6 +53,7 @@
     "globals": "^17.6.0",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.59.2",
-    "vite": "^8.0.12"
+    "vite": "^8.0.12",
+    "vitest": "^3.2.4"
   }
 }
