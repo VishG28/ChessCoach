@@ -1,4 +1,5 @@
 // src/components/coaching/CoachMessage.tsx
+import type { ComponentProps } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { Card } from '@/components/ui/card'
@@ -20,13 +21,23 @@ interface Props {
   onQuieter?: () => void
 }
 
-const QUIET_PREFIX = 'Position is roughly equal'
 const QUIET_LENGTH_THRESHOLD = 80
 
 function isQuiet(content: string): boolean {
-  if (content.startsWith(QUIET_PREFIX)) return true
-  if (content.trim().length > 0 && content.length < QUIET_LENGTH_THRESHOLD) return true
+  if (content.trim().startsWith('- Position is quiet')) return true
+  const isList = content.trim().startsWith('-')
+  if (!isList && content.trim().length > 0 && content.length < QUIET_LENGTH_THRESHOLD) return true
   return false
+}
+
+const mdComponents: ComponentProps<typeof ReactMarkdown>['components'] = {
+  ul: (props) => <ul {...props} className="pl-4 my-0 space-y-1 list-disc" />,
+  ol: (props) => <ol {...props} className="pl-4 my-0 space-y-1 list-decimal" />,
+  li: (props) => <li {...props} className="leading-snug text-sm" />,
+  strong: (props) => (
+    <strong {...props} className="font-semibold" style={{ color: 'var(--primary)' }} />
+  ),
+  p: (props) => <p {...props} className="my-0" />,
 }
 
 export function CoachMessage({ message }: Props) {
@@ -40,7 +51,15 @@ export function CoachMessage({ message }: Props) {
   const quiet = !message.streaming && isQuiet(message.content)
   const bodyClass = quiet
     ? 'italic text-muted-foreground text-sm leading-relaxed'
-    : 'text-base leading-relaxed prose prose-sm dark:prose-invert max-w-none'
+    : 'text-left text-base leading-relaxed prose prose-sm dark:prose-invert max-w-none'
+
+  const isList = message.content.trim().startsWith('-')
+
+  const md = (
+    <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
+      {message.content || '…'}
+    </ReactMarkdown>
+  )
 
   return (
     <Card className={`${accent} bg-card`}>
@@ -51,15 +70,19 @@ export function CoachMessage({ message }: Props) {
             <span className="ml-2 capitalize">{message.trigger.replace('_', ' ')}</span>
           </span>
         </div>
-        <div className={`${bodyClass} max-h-[120px] overflow-hidden`}>
+        <div className={`${bodyClass} max-h-[260px] overflow-y-auto`}>
           {message.streaming ? (
-            // Mid-stream: render raw content so it streams character-by-character.
-            // No sentence-fade until streaming completes.
+            // Mid-stream: render markdown (not raw text) so bullets form incrementally.
             quiet ? (
               <span>{message.content || '…'}</span>
             ) : (
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content || '…'}</ReactMarkdown>
+              md
             )
+          ) : quiet ? (
+            <span className="italic">{message.content}</span>
+          ) : isList ? (
+            // Bullet list — skip SentenceFade, render markdown directly.
+            md
           ) : (
             <SentenceFade content={message.content} />
           )}
