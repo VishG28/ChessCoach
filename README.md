@@ -74,6 +74,7 @@ fails: re-copy the key directly from
 - Neural opponent: [Maia](https://github.com/CSSLab/maia-chess) (CSSLab, U of Toronto)
 - Opening data: [Lichess explorer](https://explorer.lichess.ovh)
 - ONNX runtime: [onnxruntime-web](https://onnxruntime.ai/docs/tutorials/web/)
+- Piece sets: [Lichess](https://github.com/lichess-org/lila) (MIT licensed) — cburnett, fantasy, merida, alpha
 
 ## Local development
 
