@@ -1,22 +1,30 @@
 /**
  * Unified opponent move strategy.
  *
+ * The engine source is resolved from Elo only (see `engineRouting.ts`):
+ *   • 1100 ≤ elo < 1900  → Maia neural net
+ *   • elo ≥ 1900          → Stockfish with UCI_LimitStrength + UCI_Elo
+ *
  * Order of operations:
  *   1. Opening book (Lichess explorer) when within the book ply limit.
- *   2. Maia neural network if mode === 'maia'.
- *   3. Stockfish with calibrated weakening + blunder/random rolls.
+ *   2. Maia neural network when the resolved source is Maia.
+ *   3. Stockfish best move at calibrated depth when the resolved source is
+ *      Stockfish (or as fallback when Maia load/predict fails).
  *
- * If Maia is unavailable (network/load error), the facade falls back to the
- * Stockfish weakening pipeline so the user can keep playing.
+ * The Phase 3A weakening rolls (random/blunder injection) have been removed —
+ * Stockfish above 1900 is trusted to deliver the rated strength via UCI.
  */
 
 import { getBookMove } from './openingBook'
 import { requestMaiaMove, maiaModelName } from './maia'
-import { getWeakeningParams, selectMove } from './weakening'
+import { resolveEngine } from './engineRouting'
 import type { Engine } from './engine'
-import type { TopCandidate } from './types'
 import type { MoveSource } from '@/games/types'
 
+/**
+ * @deprecated Engine source is now resolved from Elo. Kept exported only for
+ * legacy meta/logging surfaces that still reference the type name.
+ */
 export type OpponentMode = 'stockfish' | 'maia'
 
 export interface OpponentMoveResult {
@@ -24,7 +32,6 @@ export interface OpponentMoveResult {
   source: MoveSource
   engineModel: string
   bookWeight?: number
-  rollMeta?: { roll: string; cpPlayed?: number; cpBest?: number }
 }
 
 export interface OpponentMoveOptions {
@@ -33,8 +40,6 @@ export interface OpponentMoveOptions {
   /** 1-based count of plies played so far. */
   ply: number
   elo: number
-  mode: OpponentMode
-  liveEvalCp?: number
 }
 
 const STOCKFISH_BOOK_MAX_PLY = 24       // 12 full moves
@@ -43,10 +48,11 @@ const MAIA_LOW_ELO_BOOK_MAX_PLY = 16    // 8 full moves for sub-1400
 export async function requestOpponentMove(
   opts: OpponentMoveOptions,
 ): Promise<OpponentMoveResult> {
-  const { engine, fen, ply, elo, mode, liveEvalCp } = opts
+  const { engine, fen, ply, elo } = opts
+  const resolved = resolveEngine(elo)
 
   const bookPlyLimit =
-    mode === 'maia'
+    resolved.source === 'maia'
       ? elo < 1400
         ? MAIA_LOW_ELO_BOOK_MAX_PLY
         : 0
@@ -58,13 +64,14 @@ export async function requestOpponentMove(
       return {
         uci: book.uci,
         source: 'book',
-        engineModel: mode === 'maia' ? maiaModelName(elo) : 'stockfish-18',
+        engineModel:
+          resolved.source === 'maia' ? maiaModelName(elo) : 'stockfish-18',
         bookWeight: book.weight,
       }
     }
   }
 
-  if (mode === 'maia') {
+  if (resolved.source === 'maia') {
     try {
       const uci = await requestMaiaMove(fen, elo)
       return { uci, source: 'maia', engineModel: maiaModelName(elo) }
@@ -73,32 +80,13 @@ export async function requestOpponentMove(
     }
   }
 
-  const params = getWeakeningParams(elo)
-  const engineMove = await engine.requestMove({
-    fen,
-    depth: params.depth,
-    movetime: params.movetime,
-    multipv: params.multipv,
-  })
-  const candidates: TopCandidate[] = engineMove.topCandidates ?? [
-    {
-      move: `${engineMove.from}${engineMove.to}${engineMove.promotion ?? ''}`,
-      cp: 0,
-      pv: [],
-    },
-  ]
-  const result = selectMove({
-    candidates,
-    randomMoveChance: params.randomMoveChance,
-    blunderChance: params.blunderChance,
-    fenBefore: fen,
-    eloForSanity: elo,
-    evalCp: liveEvalCp,
-  })
+  const depth = resolved.sfDepth ?? 14
+  const movetime = resolved.sfMovetimeMs ?? 1000
+  const engineMove = await engine.requestMove({ fen, depth, movetime, multipv: 1 })
+  const uci = `${engineMove.from}${engineMove.to}${engineMove.promotion ?? ''}`
   return {
-    uci: result.uci,
+    uci,
     source: 'stockfish',
     engineModel: 'stockfish-18',
-    rollMeta: { roll: result.roll, cpPlayed: result.cpPlayed, cpBest: result.cpBest },
   }
 }

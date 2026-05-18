@@ -8,7 +8,7 @@ import { CapturedPieces } from '@/components/board/CapturedPieces'
 import { BoardActionBar } from '@/components/board/BoardActionBar'
 import { MoveNavBar } from '@/components/board/MoveNavBar'
 import { CoachPanel } from '@/components/coaching/CoachPanel'
-import { EngineSelector, getDefaultEngine } from '@/components/coaching/EngineSelector'
+import { EngineScopeCard } from '@/components/onboarding/EngineScopeCard'
 import {
   LeftSidebar,
   type CoachMode,
@@ -31,8 +31,9 @@ import { useShortcut } from '@/lib/shortcuts'
 import { fenAtPly, lastMoveAtPly } from '@/lib/historyNavigation'
 import { cn } from '@/lib/utils'
 import type { MoveSourceInfo } from '@/components/sidebar/RightSidebar'
-import { requestOpponentMove, type OpponentMode } from '@/engine/opponentEngine'
-import { loadMaiaModel, maiaModelName, selectMaiaModel } from '@/engine/maia'
+import { requestOpponentMove } from '@/engine/opponentEngine'
+import { loadMaiaModel, selectMaiaModel } from '@/engine/maia'
+import { resolveEngine } from '@/engine/engineRouting'
 import { useAllowPremoves, usePremoveQueue, premoveStillLegal, useArrowsMaster, useArrowsBest, useArrowsThreats } from '@/lib/usePremove'
 import { bestMoveShape, threatShapes } from '@/components/board/BoardArrows'
 import type { DrawShape } from 'chessground/draw'
@@ -50,7 +51,7 @@ function uciToSanLocal(fen: string, uci: string): string {
   }
 }
 
-const DEFAULT_ELO = 800
+const DEFAULT_ELO = 1100
 const DEFAULT_COACH_MODE: CoachMode = 'warnings'
 const DEFAULT_USER_COLOR: UserColor = 'white'
 
@@ -90,7 +91,8 @@ export function PlayPage() {
   }
   const [debugOpen, setDebugOpen] = useState(false)
   const [engineThinking, setEngineThinking] = useState(false)
-  const [engineMode, setEngineMode] = useState<OpponentMode>(getDefaultEngine())
+  const resolvedEngine = resolveEngine(elo)
+  const engineMode: 'maia' | 'stockfish' = resolvedEngine.source
 
   // Premove support
   const [allowPremovesPref, setAllowPremovesPref] = useAllowPremoves()
@@ -115,9 +117,9 @@ export function PlayPage() {
   const [arrowsBest, setArrowsBest] = useArrowsBest()
   const [arrowsThreats, setArrowsThreats] = useArrowsThreats()
 
-  // Lazy-load Maia model when the user picks Maia or changes Elo bucket.
-  // On load failure, swap to Stockfish so the rest of the session uses a
-  // working engine without per-move retry storms.
+  // Lazy-load Maia model whenever the resolved engine source is Maia and the
+  // Elo bucket changes. On load failure, requestOpponentMove falls back to
+  // Stockfish per-move; we surface a one-shot toast here.
   useEffect(() => {
     if (engineMode !== 'maia') return
     const tid = toast.loading('Loading Maia neural network…')
@@ -125,8 +127,7 @@ export function PlayPage() {
       .then(() => toast.success(`Maia ${selectMaiaModel(elo)} ready`, { id: tid }))
       .catch((e) => {
         console.error('Maia load failed:', e)
-        setEngineMode('stockfish')
-        toast.error('Maia unavailable, using Stockfish for this game', { id: tid })
+        toast.error('Maia unavailable, falling back to Stockfish per move', { id: tid })
       })
   }, [engineMode, elo])
 
@@ -284,7 +285,7 @@ export function PlayPage() {
     userColor: userColor === 'w' ? 'white' : 'black',
     coachMode,
     engine: engineMode,
-    engineModel: engineMode === 'maia' ? maiaModelName(elo) : 'stockfish-18',
+    engineModel: resolvedEngine.modelLabel,
     coachMessage: coach.blunderAlert
       ? { ply: game.history.length, text: `Blunder: ${coach.blunderAlert.san} lost ${coach.blunderAlert.loss}cp. Engine prefers ${coach.blunderAlert.better}.` }
       : null,
@@ -408,6 +409,8 @@ export function PlayPage() {
     void (async () => {
       try {
         const startedAt = performance.now()
+        // liveEval cp is read elsewhere; explicitly mark unused here.
+        void evalCp
 
         // Unified opponent move pipeline: book → maia (with Stockfish fallback) → Stockfish.
         const result = await requestOpponentMove({
@@ -415,8 +418,6 @@ export function PlayPage() {
           fen: fenBefore,
           ply,
           elo,
-          mode: engineMode,
-          liveEvalCp: evalCp,
         })
         if (engineRequestIdRef.current !== requestId) return
 
@@ -484,14 +485,6 @@ export function PlayPage() {
         const lastEntry = game.history[game.history.length - 1]
         if (lastEntry && engine && result.source === 'stockfish') {
           engine.recordEngineMoveSan(chosenUci, lastEntry.san)
-          if (result.rollMeta) {
-            const cpBest = result.rollMeta.cpBest ?? 0
-            engine.recordRoll(
-              chosenUci,
-              result.rollMeta.roll as 'best' | 'random' | 'blunder' | 'filtered',
-              cpBest,
-            )
-          }
         }
       } catch {
         // Engine disposed mid-request, or transport error. Silent fail —
@@ -690,7 +683,9 @@ export function PlayPage() {
   }
 
   return (
-    <div className="mx-auto grid w-full max-w-[1280px] grid-cols-1 gap-6 px-6 py-8 md:grid-cols-[280px_1fr_320px]">
+    <div className="mx-auto w-full max-w-[1280px] px-6 py-8">
+      <EngineScopeCard />
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-[280px_1fr_320px]">
       <aside className="space-y-4 md:sticky md:top-20 md:self-start">
         <LeftSidebar
           elo={elo}
@@ -714,9 +709,6 @@ export function PlayPage() {
           arrowsThreats={arrowsThreats}
           onArrowsThreatsChange={setArrowsThreats}
         />
-        <div className="rounded-lg border bg-card p-4">
-          <EngineSelector value={engineMode} onChange={setEngineMode} disabled={false} />
-        </div>
       </aside>
 
       <main className="flex flex-col items-center gap-4">
@@ -812,6 +804,7 @@ export function PlayPage() {
       </aside>
 
       {debugOpen && engine && <DebugOverlay engine={engine} elo={elo} />}
+      </div>
     </div>
   )
 }

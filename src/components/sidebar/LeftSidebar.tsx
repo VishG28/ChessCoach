@@ -1,3 +1,5 @@
+import { useState } from 'react'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -16,6 +18,14 @@ import { BoardThemeCard } from '@/components/sidebar/BoardThemeCard'
 import { PieceSetCard } from '@/components/sidebar/PieceSetCard'
 import { useBoardTheme } from '@/components/board/BoardThemeProvider'
 import { usePieceSet } from '@/components/board/PieceSetProvider'
+import {
+  resolveEngine,
+  skillDescription,
+  ELO_MIN,
+  ELO_MAX,
+  ELO_TICKS,
+} from '@/engine/engineRouting'
+import { RatingHelpModal } from '@/components/onboarding/RatingHelpModal'
 
 function ResetAppearanceButton() {
   const { setThemeId } = useBoardTheme()
@@ -102,6 +112,10 @@ export function LeftSidebar({
   const ready = engineStatus === 'ready'
   const styleDisabled = coachMode !== 'full'
   const premovesDisabled = coachMode === 'full'
+  const [ratingHelpOpen, setRatingHelpOpen] = useState(false)
+  const resolved = resolveEngine(elo)
+  const tickPercent = (e: number): number =>
+    ((e - ELO_MIN) / (ELO_MAX - ELO_MIN)) * 100
 
   return (
     <>
@@ -120,21 +134,56 @@ export function LeftSidebar({
               {elo}
             </span>
           </div>
-          <Slider
-            id="engine-elo"
-            min={300}
-            max={2000}
-            step={20}
-            value={[elo]}
-            onValueChange={(values) => {
-              const next = values[0]
-              if (typeof next === 'number') onEloChange(next)
-            }}
-          />
-          <div className="flex justify-between text-[0.65rem] font-medium uppercase tracking-wider text-muted-foreground">
-            <span>Beginner</span>
-            <span>Master</span>
+          <div className="relative">
+            <Slider
+              id="engine-elo"
+              min={ELO_MIN}
+              max={ELO_MAX}
+              step={50}
+              value={[elo]}
+              onValueChange={(values) => {
+                const next = values[0]
+                if (typeof next === 'number') onEloChange(next)
+              }}
+            />
+            <div className="pointer-events-none relative mt-1 h-2">
+              {ELO_TICKS.map((t) => (
+                <span
+                  key={t}
+                  className="absolute top-0 h-1.5 w-px -translate-x-1/2 bg-muted-foreground/40"
+                  style={{ left: `${tickPercent(t)}%` }}
+                  aria-hidden="true"
+                />
+              ))}
+            </div>
+            <div className="relative mt-1 h-4 text-[0.6rem] font-medium uppercase tracking-wider text-muted-foreground">
+              {ELO_TICKS.map((t) => (
+                <span
+                  key={t}
+                  className="absolute -translate-x-1/2 tabular-nums"
+                  style={{ left: `${tickPercent(t)}%` }}
+                >
+                  {t}
+                </span>
+              ))}
+            </div>
           </div>
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            <Badge variant="secondary" className="font-mono">
+              {resolved.modelLabel}
+            </Badge>
+            <span className="text-xs text-muted-foreground">
+              {skillDescription(elo)}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setRatingHelpOpen(true)}
+            className="text-xs text-primary underline-offset-2 hover:underline"
+          >
+            What&rsquo;s my rating?
+          </button>
+          <RatingHelpModal open={ratingHelpOpen} onOpenChange={setRatingHelpOpen} />
         </section>
 
         <section className="space-y-3">
