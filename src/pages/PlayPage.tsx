@@ -113,12 +113,18 @@ export function PlayPage() {
   const [arrowsThreats, setArrowsThreats] = useArrowsThreats()
 
   // Lazy-load Maia model when the user picks Maia or changes Elo bucket.
+  // On load failure, swap to Stockfish so the rest of the session uses a
+  // working engine without per-move retry storms.
   useEffect(() => {
     if (engineMode !== 'maia') return
     const tid = toast.loading('Loading Maia neural network…')
     loadMaiaModel(elo)
       .then(() => toast.success(`Maia ${selectMaiaModel(elo)} ready`, { id: tid }))
-      .catch((e) => toast.error(`Maia load failed: ${String(e)}`, { id: tid }))
+      .catch((e) => {
+        console.error('Maia load failed:', e)
+        setEngineMode('stockfish')
+        toast.error('Maia unavailable, using Stockfish for this game', { id: tid })
+      })
   }, [engineMode, elo])
 
   const userColor: Color = game.orientation === 'white' ? 'w' : 'b'

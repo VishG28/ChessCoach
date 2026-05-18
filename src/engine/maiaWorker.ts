@@ -1,7 +1,13 @@
 import * as ort from 'onnxruntime-web'
 import { fenToMaiaInput, sampleFromPolicy, getLegalUcisForPolicy } from './maiaEncoding'
 
-ort.env.wasm.wasmPaths = '/ChessCoach/ort/'
+// GitHub Pages can't set COOP/COEP, so SharedArrayBuffer/threading is unavailable.
+// Force single-threaded SIMD WASM; the same threaded-named binary runs single-
+// threaded when numThreads = 1 (ORT 1.17+).
+ort.env.wasm.numThreads = 1
+ort.env.wasm.simd = true
+ort.env.wasm.proxy = false
+ort.env.wasm.wasmPaths = `${import.meta.env.BASE_URL}ort/`
 
 interface LoadMsg {
   type: 'load'
@@ -32,6 +38,7 @@ self.onmessage = async (e: MessageEvent<In>): Promise<void> => {
     try {
       const session = await ort.InferenceSession.create(msg.modelUrl, {
         executionProviders: ['wasm'],
+        graphOptimizationLevel: 'all',
       })
       sessions.set(msg.modelKey, session)
       post({ type: 'loaded', modelKey: msg.modelKey })
