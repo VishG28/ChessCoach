@@ -25,6 +25,7 @@ function buildMarbleSvg(palette: readonly string[]): string {
 function applyTheme(id: BoardThemeId): void {
   const theme = BOARD_THEMES[id]
   const root = document.documentElement
+  root.setAttribute('data-board-theme', id)
   root.style.setProperty('--cc-board-border', theme.border)
   root.style.setProperty('--cc-board-selected', theme.selected)
   root.style.setProperty('--cc-board-last-move', theme.lastMove)
