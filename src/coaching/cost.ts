@@ -55,3 +55,25 @@ export function formatUSD(amount: number): string {
   if (!Number.isFinite(amount) || amount < 0) return '$0.0000'
   return `$${amount.toFixed(4)}`
 }
+
+/** Subset of CostCounter totals needed to render a session-cost summary. */
+export interface CostTotalsSummary {
+  usd: number
+  usdWithoutCache: number
+  cacheCreationTokens: number
+  cacheReadTokens: number
+}
+
+/**
+ * Compact summary string used by sidebars/footers.
+ * Example: "$0.0123 · cache writes 1234 · reads 5678 · saved $0.0456".
+ */
+export function summarizeTotals(totals: CostTotalsSummary): string {
+  const saved = Math.max(0, totals.usdWithoutCache - totals.usd)
+  return [
+    formatUSD(totals.usd),
+    `cache writes ${totals.cacheCreationTokens}`,
+    `reads ${totals.cacheReadTokens}`,
+    `saved ${formatUSD(saved)}`,
+  ].join(' · ')
+}

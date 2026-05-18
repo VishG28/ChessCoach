@@ -10,7 +10,6 @@ import {
 import {
   estimateCost,
   estimateCostWithoutCache,
-  formatUSD,
   type UsageRecord,
 } from './cost'
 
@@ -118,16 +117,3 @@ export function CostCounterProvider({ children }: { children: ReactNode }) {
   )
 }
 
-/**
- * Compact summary string used by sidebars/footers.
- * Example: "$0.0123 · cache writes 1234 · reads 5678 · saved $0.0456".
- */
-export function summarizeTotals(totals: CostTotals): string {
-  const saved = Math.max(0, totals.usdWithoutCache - totals.usd)
-  return [
-    formatUSD(totals.usd),
-    `cache writes ${totals.cacheCreationTokens}`,
-    `reads ${totals.cacheReadTokens}`,
-    `saved ${formatUSD(saved)}`,
-  ].join(' · ')
-}
