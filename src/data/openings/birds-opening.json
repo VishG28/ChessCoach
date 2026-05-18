@@ -1,0 +1,29 @@
+{
+  "id": "birds-opening",
+  "name": "Bird's Opening",
+  "eco": "A02",
+  "popularityRank": 99,
+  "category": "underrated",
+  "side": "white",
+  "startingMoves": [
+    "f4"
+  ],
+  "description": "Placeholder — run `npm run openings:generate -- --id birds-opening` to populate.",
+  "whyPlayIt": "Placeholder — see description.",
+  "keyIdeas": [
+    "Placeholder idea 1.",
+    "Placeholder idea 2.",
+    "Placeholder idea 3."
+  ],
+  "mainLine": [
+    {
+      "san": "f4",
+      "uci": "f2f4",
+      "fen": "rnbqkbnr/pppppppp/8/8/5P2/8/PPPPP1PP/RNBQKBNR b KQkq - 0 1",
+      "explanation": "Placeholder explanation."
+    }
+  ],
+  "variations": [],
+  "commonAmateurResponses": [],
+  "trapsToKnow": []
+}

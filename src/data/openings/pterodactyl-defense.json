@@ -1,0 +1,50 @@
+{
+  "id": "pterodactyl-defense",
+  "name": "Pterodactyl Defense",
+  "eco": "A40",
+  "popularityRank": 99,
+  "category": "underrated",
+  "side": "black",
+  "startingMoves": [
+    "d4",
+    "g6",
+    "c4",
+    "Bg7"
+  ],
+  "description": "Placeholder — run `npm run openings:generate -- --id pterodactyl-defense` to populate.",
+  "whyPlayIt": "Placeholder — see description.",
+  "keyIdeas": [
+    "Placeholder idea 1.",
+    "Placeholder idea 2.",
+    "Placeholder idea 3."
+  ],
+  "mainLine": [
+    {
+      "san": "d4",
+      "uci": "d2d4",
+      "fen": "rnbqkbnr/pppppppp/8/8/3P4/8/PPP1PPPP/RNBQKBNR b KQkq - 0 1",
+      "explanation": "Placeholder explanation."
+    },
+    {
+      "san": "g6",
+      "uci": "g7g6",
+      "fen": "rnbqkbnr/pppppp1p/6p1/8/3P4/8/PPP1PPPP/RNBQKBNR w KQkq - 0 2",
+      "explanation": "Placeholder explanation."
+    },
+    {
+      "san": "c4",
+      "uci": "c2c4",
+      "fen": "rnbqkbnr/pppppp1p/6p1/8/2PP4/8/PP2PPPP/RNBQKBNR b KQkq - 0 2",
+      "explanation": "Placeholder explanation."
+    },
+    {
+      "san": "Bg7",
+      "uci": "f8g7",
+      "fen": "rnbqk1nr/ppppppbp/6p1/8/2PP4/8/PP2PPPP/RNBQKBNR w KQkq - 1 3",
+      "explanation": "Placeholder explanation."
+    }
+  ],
+  "variations": [],
+  "commonAmateurResponses": [],
+  "trapsToKnow": []
+}

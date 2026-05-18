@@ -1,0 +1,50 @@
+{
+  "id": "kings-indian-defense",
+  "name": "King's Indian Defense",
+  "eco": "E60",
+  "popularityRank": 99,
+  "category": "main_lines",
+  "side": "black",
+  "startingMoves": [
+    "d4",
+    "Nf6",
+    "c4",
+    "g6"
+  ],
+  "description": "Placeholder — run `npm run openings:generate -- --id kings-indian-defense` to populate.",
+  "whyPlayIt": "Placeholder — see description.",
+  "keyIdeas": [
+    "Placeholder idea 1.",
+    "Placeholder idea 2.",
+    "Placeholder idea 3."
+  ],
+  "mainLine": [
+    {
+      "san": "d4",
+      "uci": "d2d4",
+      "fen": "rnbqkbnr/pppppppp/8/8/3P4/8/PPP1PPPP/RNBQKBNR b KQkq - 0 1",
+      "explanation": "Placeholder explanation."
+    },
+    {
+      "san": "Nf6",
+      "uci": "g8f6",
+      "fen": "rnbqkb1r/pppppppp/5n2/8/3P4/8/PPP1PPPP/RNBQKBNR w KQkq - 1 2",
+      "explanation": "Placeholder explanation."
+    },
+    {
+      "san": "c4",
+      "uci": "c2c4",
+      "fen": "rnbqkb1r/pppppppp/5n2/8/2PP4/8/PP2PPPP/RNBQKBNR b KQkq - 0 2",
+      "explanation": "Placeholder explanation."
+    },
+    {
+      "san": "g6",
+      "uci": "g7g6",
+      "fen": "rnbqkb1r/pppppp1p/5np1/8/2PP4/8/PP2PPPP/RNBQKBNR w KQkq - 0 3",
+      "explanation": "Placeholder explanation."
+    }
+  ],
+  "variations": [],
+  "commonAmateurResponses": [],
+  "trapsToKnow": []
+}

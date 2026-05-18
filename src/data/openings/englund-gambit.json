@@ -1,0 +1,36 @@
+{
+  "id": "englund-gambit",
+  "name": "Englund Gambit",
+  "eco": "A40",
+  "popularityRank": 99,
+  "category": "underrated",
+  "side": "black",
+  "startingMoves": [
+    "d4",
+    "e5"
+  ],
+  "description": "Placeholder — run `npm run openings:generate -- --id englund-gambit` to populate.",
+  "whyPlayIt": "Placeholder — see description.",
+  "keyIdeas": [
+    "Placeholder idea 1.",
+    "Placeholder idea 2.",
+    "Placeholder idea 3."
+  ],
+  "mainLine": [
+    {
+      "san": "d4",
+      "uci": "d2d4",
+      "fen": "rnbqkbnr/pppppppp/8/8/3P4/8/PPP1PPPP/RNBQKBNR b KQkq - 0 1",
+      "explanation": "Placeholder explanation."
+    },
+    {
+      "san": "e5",
+      "uci": "e7e5",
+      "fen": "rnbqkbnr/pppp1ppp/8/4p3/3P4/8/PPP1PPPP/RNBQKBNR w KQkq - 0 2",
+      "explanation": "Placeholder explanation."
+    }
+  ],
+  "variations": [],
+  "commonAmateurResponses": [],
+  "trapsToKnow": []
+}

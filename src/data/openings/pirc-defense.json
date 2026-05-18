@@ -1,0 +1,64 @@
+{
+  "id": "pirc-defense",
+  "name": "Pirc Defense",
+  "eco": "B07",
+  "popularityRank": 99,
+  "category": "main_lines",
+  "side": "black",
+  "startingMoves": [
+    "e4",
+    "d6",
+    "d4",
+    "Nf6",
+    "Nc3",
+    "g6"
+  ],
+  "description": "Placeholder — run `npm run openings:generate -- --id pirc-defense` to populate.",
+  "whyPlayIt": "Placeholder — see description.",
+  "keyIdeas": [
+    "Placeholder idea 1.",
+    "Placeholder idea 2.",
+    "Placeholder idea 3."
+  ],
+  "mainLine": [
+    {
+      "san": "e4",
+      "uci": "e2e4",
+      "fen": "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1",
+      "explanation": "Placeholder explanation."
+    },
+    {
+      "san": "d6",
+      "uci": "d7d6",
+      "fen": "rnbqkbnr/ppp1pppp/3p4/8/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2",
+      "explanation": "Placeholder explanation."
+    },
+    {
+      "san": "d4",
+      "uci": "d2d4",
+      "fen": "rnbqkbnr/ppp1pppp/3p4/8/3PP3/8/PPP2PPP/RNBQKBNR b KQkq - 0 2",
+      "explanation": "Placeholder explanation."
+    },
+    {
+      "san": "Nf6",
+      "uci": "g8f6",
+      "fen": "rnbqkb1r/ppp1pppp/3p1n2/8/3PP3/8/PPP2PPP/RNBQKBNR w KQkq - 1 3",
+      "explanation": "Placeholder explanation."
+    },
+    {
+      "san": "Nc3",
+      "uci": "b1c3",
+      "fen": "rnbqkb1r/ppp1pppp/3p1n2/8/3PP3/2N5/PPP2PPP/R1BQKBNR b KQkq - 2 3",
+      "explanation": "Placeholder explanation."
+    },
+    {
+      "san": "g6",
+      "uci": "g7g6",
+      "fen": "rnbqkb1r/ppp1pp1p/3p1np1/8/3PP3/2N5/PPP2PPP/R1BQKBNR w KQkq - 0 4",
+      "explanation": "Placeholder explanation."
+    }
+  ],
+  "variations": [],
+  "commonAmateurResponses": [],
+  "trapsToKnow": []
+}

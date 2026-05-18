@@ -1,0 +1,29 @@
+{
+  "id": "larsens-opening",
+  "name": "Larsen's Opening",
+  "eco": "A01",
+  "popularityRank": 99,
+  "category": "underrated",
+  "side": "white",
+  "startingMoves": [
+    "b3"
+  ],
+  "description": "Placeholder — run `npm run openings:generate -- --id larsens-opening` to populate.",
+  "whyPlayIt": "Placeholder — see description.",
+  "keyIdeas": [
+    "Placeholder idea 1.",
+    "Placeholder idea 2.",
+    "Placeholder idea 3."
+  ],
+  "mainLine": [
+    {
+      "san": "b3",
+      "uci": "b2b3",
+      "fen": "rnbqkbnr/pppppppp/8/8/8/1P6/P1PPPPPP/RNBQKBNR b KQkq - 0 1",
+      "explanation": "Placeholder explanation."
+    }
+  ],
+  "variations": [],
+  "commonAmateurResponses": [],
+  "trapsToKnow": []
+}

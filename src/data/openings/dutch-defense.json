@@ -1,0 +1,36 @@
+{
+  "id": "dutch-defense",
+  "name": "Dutch Defense",
+  "eco": "A80",
+  "popularityRank": 99,
+  "category": "main_lines",
+  "side": "black",
+  "startingMoves": [
+    "d4",
+    "f5"
+  ],
+  "description": "Placeholder — run `npm run openings:generate -- --id dutch-defense` to populate.",
+  "whyPlayIt": "Placeholder — see description.",
+  "keyIdeas": [
+    "Placeholder idea 1.",
+    "Placeholder idea 2.",
+    "Placeholder idea 3."
+  ],
+  "mainLine": [
+    {
+      "san": "d4",
+      "uci": "d2d4",
+      "fen": "rnbqkbnr/pppppppp/8/8/3P4/8/PPP1PPPP/RNBQKBNR b KQkq - 0 1",
+      "explanation": "Placeholder explanation."
+    },
+    {
+      "san": "f5",
+      "uci": "f7f5",
+      "fen": "rnbqkbnr/ppppp1pp/8/5p2/3P4/8/PPP1PPPP/RNBQKBNR w KQkq - 0 2",
+      "explanation": "Placeholder explanation."
+    }
+  ],
+  "variations": [],
+  "commonAmateurResponses": [],
+  "trapsToKnow": []
+}

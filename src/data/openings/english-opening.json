@@ -1,0 +1,29 @@
+{
+  "id": "english-opening",
+  "name": "English Opening",
+  "eco": "A10",
+  "popularityRank": 99,
+  "category": "main_lines",
+  "side": "white",
+  "startingMoves": [
+    "c4"
+  ],
+  "description": "Placeholder — run `npm run openings:generate -- --id english-opening` to populate.",
+  "whyPlayIt": "Placeholder — see description.",
+  "keyIdeas": [
+    "Placeholder idea 1.",
+    "Placeholder idea 2.",
+    "Placeholder idea 3."
+  ],
+  "mainLine": [
+    {
+      "san": "c4",
+      "uci": "c2c4",
+      "fen": "rnbqkbnr/pppppppp/8/8/2P5/8/PP1PPPPP/RNBQKBNR b KQkq - 0 1",
+      "explanation": "Placeholder explanation."
+    }
+  ],
+  "variations": [],
+  "commonAmateurResponses": [],
+  "trapsToKnow": []
+}
