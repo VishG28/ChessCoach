@@ -21,6 +21,23 @@ export function RootLayout() {
       <ShortcutCheatsheet />
       <Toaster richColors closeButton position="bottom-right" />
 
+      {/* Attribution footer — hidden on mobile to avoid clashing with the bottom nav. */}
+      <footer
+        className="hidden md:block border-t border-border/40 bg-background/60 px-6 py-3 text-[0.7rem] text-muted-foreground"
+        aria-label="Attribution"
+      >
+        Opening book powered by{' '}
+        <a
+          href="https://lichess.org/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="underline-offset-2 hover:text-foreground hover:underline"
+        >
+          Lichess.org
+        </a>
+        .
+      </footer>
+
       {/* Mobile bottom nav — hidden on md+ */}
       <nav
         className="fixed bottom-0 inset-x-0 z-40 flex md:hidden h-16 border-t bg-background/90 backdrop-blur"
