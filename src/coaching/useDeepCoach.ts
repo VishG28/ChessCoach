@@ -7,7 +7,7 @@ import {
   type PostMoveContext,
   type StreamCoachUsage,
   streamCoachMessage,
-  usdCost,
+  toUsageRecord,
 } from './deepCoach'
 import { useApiKey } from './apiKey'
 import { useCostCounter } from './costCounter'
@@ -82,7 +82,7 @@ interface StoredCoachContext {
 
 export function useDeepCoach({ style, enabled, onComplete }: UseDeepCoachOpts) {
   const { getKey } = useApiKey()
-  const { add: addCost } = useCostCounter()
+  const { record: recordCost } = useCostCounter()
   const [messages, setMessages] = useState<LiveCoachMessage[]>([])
   const cacheRef = useRef<Map<string, LiveCoachMessage>>(new Map())
   const inFlightRef = useRef<AbortController | null>(null)
@@ -142,7 +142,7 @@ export function useDeepCoach({ style, enabled, onComplete }: UseDeepCoachOpts) {
           followUp: opts.followUp,
           signal: ac.signal,
         },
-        (u: StreamCoachUsage) => addCost(usdCost(u)),
+        (u: StreamCoachUsage) => recordCost(toUsageRecord(u)),
       )
       let acc = ''
       while (true) {
@@ -172,7 +172,7 @@ export function useDeepCoach({ style, enabled, onComplete }: UseDeepCoachOpts) {
         prev.map((m) => (m.id === id ? { ...m, content: errMsg, streaming: false } : m)),
       )
     }
-  }, [style, addCost, onComplete])
+  }, [style, recordCost, onComplete])
 
   const fire = useCallback(
     (opts: FireOpts): void => {
@@ -239,7 +239,7 @@ export function useDeepCoach({ style, enabled, onComplete }: UseDeepCoachOpts) {
           postMove: ctx.postMove,
           signal: ac.signal,
         },
-        (u: StreamCoachUsage) => addCost(usdCost(u)),
+        (u: StreamCoachUsage) => recordCost(toUsageRecord(u)),
       )
       let acc = ''
       while (true) {
@@ -262,7 +262,7 @@ export function useDeepCoach({ style, enabled, onComplete }: UseDeepCoachOpts) {
         prev.map((m) => (m.id === newId ? { ...m, content: errMsg, streaming: false } : m)),
       )
     }
-  }, [enabled, getKey, addCost, onComplete])
+  }, [enabled, getKey, recordCost, onComplete])
 
   return { messages, fire, requestDeepDive, cancel }
 }

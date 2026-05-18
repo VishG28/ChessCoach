@@ -16,52 +16,111 @@ export interface BookPick {
   weight: number
 }
 
-const RATING_BUCKETS: ReadonlyArray<{ at: number; bucket: string }> = [
-  { at: 200,  bucket: '1000' },
-  { at: 400,  bucket: '1000' },
-  { at: 600,  bucket: '1200' },
-  { at: 800,  bucket: '1200' },
-  { at: 1000, bucket: '1400' },
-  { at: 1200, bucket: '1400' },
-  { at: 1400, bucket: '1600' },
-  { at: 1600, bucket: '1800' },
-  { at: 1800, bucket: '2000' },
-  { at: 2000, bucket: '2200' },
-  { at: 2200, bucket: '2500' },
-]
+// Lichess Opening Explorer accepts a fixed set of rating buckets for the
+// `ratings` query parameter. Verified against the public spec at
+// https://github.com/lichess-org/api/blob/master/doc/specs/tags/openingexplorer/lichess.yaml
+// and the upstream Rust enum `RatingGroup` in lichess-org/lila-openingexplorer
+// (src/model/lichess.rs). Each bucket represents the floor of a 200-Elo band
+// (with the final bucket covering 2500+). Sending an arbitrary integer like
+// 1100 is silently bucketed by the server, so we pre-bucket to avoid relying
+// on undocumented coercion.
+export const LICHESS_RATING_BUCKETS: ReadonlyArray<number> = [
+  0, 1000, 1200, 1400, 1600, 1800, 2000, 2200, 2500,
+] as const
 
-export function getRatingBucket(elo: number): string {
-  const clamped = Math.max(200, Math.min(2200, elo))
-  const closest = RATING_BUCKETS.reduce((prev, curr) =>
-    Math.abs(curr.at - clamped) < Math.abs(prev.at - clamped) ? curr : prev,
-  )
-  return closest.bucket
+/**
+ * Map an arbitrary Elo to the nearest valid Lichess Opening Explorer bucket.
+ *
+ * Lichess uses a fixed bucket set (see `LICHESS_RATING_BUCKETS`), not every
+ * 100 Elo. We pick the highest bucket whose floor is <= elo, mirroring the
+ * server-side `RatingGroup::select_avg` semantics.
+ */
+export function mapEloToLichessBucket(elo: number): number {
+  if (!Number.isFinite(elo) || elo <= 0) return LICHESS_RATING_BUCKETS[0]
+  let chosen = LICHESS_RATING_BUCKETS[0]
+  for (const bucket of LICHESS_RATING_BUCKETS) {
+    if (elo >= bucket) chosen = bucket
+  }
+  return chosen
 }
 
-const bookCache = new Map<string, BookResponse | null>()
-const BOOK_TIMEOUT_MS = 800
+/**
+ * @deprecated Use {@link mapEloToLichessBucket}. Retained for backwards
+ * compatibility with existing tests and call sites that want a string value.
+ */
+export function getRatingBucket(elo: number): string {
+  return String(mapEloToLichessBucket(elo))
+}
+
+const BOOK_TIMEOUT_MS = 2000
 const MIN_TOTAL_GAMES = 50
 const MIN_MOVE_GAMES = 20
-const MAX_BOOK_PLY = 24  // 12 full moves
+const MAX_BOOK_PLY = 24 // 12 full moves
+const LICHESS_SPEEDS = 'blitz,rapid'
+const LICHESS_ENDPOINT = 'https://explorer.lichess.ovh/lichess'
 
+// Lichess asks integrators to identify themselves. Per-session, this is a
+// constant; we bake the repo URL in so server-side operators can route
+// inquiries back to us.
+const USER_AGENT = 'chess-coach/1.0 (+https://github.com/VishG28/ChessCoach)'
+
+// Per-session cache keyed by `${fen}|${bucket}|${speeds}`. We store the
+// in-flight promise (not the resolved value) so concurrent callers for the
+// same position share a single network request. Resets on page reload — no
+// localStorage persistence by design.
+const bookCache = new Map<string, Promise<BookResponse | null>>()
+
+/**
+ * Fetch and sample an opening-book move from Lichess. Returns null when the
+ * position has insufficient data, the request times out, or any error occurs.
+ *
+ * Cancel-on-position-change policy: we let in-flight requests complete and
+ * cache them. The opponent engine is the only caller and re-issues only when
+ * it's the engine's turn, so request churn is naturally bounded. If a stale
+ * request resolves after the position changed, the cache hit on the new
+ * position dominates and the stale result is simply not consumed.
+ */
 export async function getBookMove(
   fen: string,
   userElo: number,
   ply: number,
 ): Promise<BookPick | null> {
   if (ply > MAX_BOOK_PLY) return null
-  const bucket = getRatingBucket(userElo)
-  const cacheKey = `${fen}|${bucket}`
-  if (bookCache.has(cacheKey)) {
-    const cached = bookCache.get(cacheKey)
-    return cached ? sampleBookMove(cached, Math.random) : null
+  const bucket = mapEloToLichessBucket(userElo)
+  const cacheKey = `${fen}|${bucket}|${LICHESS_SPEEDS}`
+  const cached = bookCache.get(cacheKey)
+  if (cached) {
+    const resolved = await cached
+    return resolved ? sampleBookMove(resolved, Math.random) : null
   }
+  const promise = fetchBook(fen, bucket)
+  bookCache.set(cacheKey, promise)
+  // If the fetch itself rejects unexpectedly, evict the cache entry so the
+  // next call retries instead of being permanently null.
+  promise.catch(() => bookCache.delete(cacheKey))
+  const book = await promise
+  return book ? sampleBookMove(book, Math.random) : null
+}
+
+async function fetchBook(
+  fen: string,
+  bucket: number,
+): Promise<BookResponse | null> {
+  const url =
+    `${LICHESS_ENDPOINT}?variant=standard` +
+    `&speeds=${LICHESS_SPEEDS}` +
+    `&ratings=${bucket}` +
+    `&fen=${encodeURIComponent(fen)}` +
+    `&moves=10` +
+    `&topGames=0` +
+    `&recentGames=0`
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), BOOK_TIMEOUT_MS)
   try {
-    const url = `https://explorer.lichess.ovh/lichess?variant=standard&speeds=blitz,rapid&ratings=${bucket}&fen=${encodeURIComponent(fen)}&moves=10`
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), BOOK_TIMEOUT_MS)
-    const res = await fetch(url, { signal: controller.signal })
-    clearTimeout(timeout)
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: { 'User-Agent': USER_AGENT },
+    })
     if (!res.ok) return null
     const data = (await res.json()) as {
       white: number
@@ -70,22 +129,18 @@ export async function getBookMove(
       moves: BookMove[]
     }
     const totalGames = data.white + data.draws + data.black
-    if (totalGames < MIN_TOTAL_GAMES) {
-      bookCache.set(cacheKey, null)
-      return null
-    }
+    if (totalGames < MIN_TOTAL_GAMES) return null
     const validMoves = data.moves.filter(
       (m) => m.white + m.draws + m.black >= MIN_MOVE_GAMES,
     )
-    if (validMoves.length === 0) {
-      bookCache.set(cacheKey, null)
-      return null
-    }
-    const book: BookResponse = { moves: validMoves }
-    bookCache.set(cacheKey, book)
-    return sampleBookMove(book, Math.random)
+    if (validMoves.length === 0) return null
+    return { moves: validMoves }
   } catch {
+    // AbortError on timeout, network errors, or JSON parse failures all
+    // fall through to engine. Opponent moves must never block on book latency.
     return null
+  } finally {
+    clearTimeout(timeout)
   }
 }
 
@@ -104,4 +159,9 @@ export function sampleBookMove(
   }
   const fallback = book.moves[0]
   return { uci: fallback.uci, san: fallback.san, weight: 0 }
+}
+
+// Test-only: clear the per-session cache so unit tests are isolated.
+export function __resetBookCacheForTests(): void {
+  bookCache.clear()
 }

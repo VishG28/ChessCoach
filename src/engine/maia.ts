@@ -7,18 +7,39 @@ const BASE = import.meta.env.BASE_URL.replace(/\/$/, '')
 
 const MAIA_MODELS: Record<number, string> = {
   1100: `${BASE}/maia/maia-1100.onnx`,
+  1200: `${BASE}/maia/maia-1200.onnx`,
   1300: `${BASE}/maia/maia-1300.onnx`,
+  1400: `${BASE}/maia/maia-1400.onnx`,
   1500: `${BASE}/maia/maia-1500.onnx`,
+  1600: `${BASE}/maia/maia-1600.onnx`,
   1700: `${BASE}/maia/maia-1700.onnx`,
+  1800: `${BASE}/maia/maia-1800.onnx`,
   1900: `${BASE}/maia/maia-1900.onnx`,
 }
 
+const MAIA_BUCKETS: ReadonlyArray<number> = [
+  1100, 1200, 1300, 1400, 1500, 1600, 1700, 1800, 1900,
+]
+
+/**
+ * Bucket an Elo to the nearest 100 within [1100, 1900]. Ties round up
+ * (e.g. 1150 → 1200) so that integer multiples of 50 land on the higher
+ * Maia model.
+ */
 export function selectMaiaModel(elo: number): number {
-  if (elo < 1200) return 1100
-  if (elo < 1400) return 1300
-  if (elo < 1600) return 1500
-  if (elo < 1800) return 1700
-  return 1900
+  if (elo <= 1100) return 1100
+  if (elo >= 1900) return 1900
+  let best = MAIA_BUCKETS[0]
+  let bestDist = Math.abs(elo - best)
+  for (const b of MAIA_BUCKETS) {
+    const d = Math.abs(elo - b)
+    // `<=` makes ties round up to the higher bucket.
+    if (d <= bestDist) {
+      best = b
+      bestDist = d
+    }
+  }
+  return best
 }
 
 interface PendingRequest {

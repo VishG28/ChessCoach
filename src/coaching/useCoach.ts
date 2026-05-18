@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Chess, type Color } from 'chess.js'
 import { toast } from 'sonner'
-import type { Engine } from '@/engine/engine'
+import { getAnalysisEngine } from '@/engine/workerPool'
 import type { LiveEval } from '@/engine/types'
 import type { UseChessGameResult } from '@/lib/useChessGame'
 import { cpLoss, isBlunder } from './blunder'
@@ -31,7 +31,12 @@ export interface BlunderAlert {
 
 export interface UseCoachOptions {
   game: UseChessGameResult
-  engine: Engine | null
+  /**
+   * Gate flag: only run blunder/eval analysis once the engine pool is ready.
+   * Owned by PlayPage (mirrors the play engine's init state). Coaching
+   * analysis itself routes to the dedicated analysis engine in the pool, not
+   * the play engine — see `ENGINE_WORKER_AUDIT.md`.
+   */
   engineReady: boolean
   mode: CoachMode
   /** The user's color. If `null` (analysis mode), the coach is effectively `'off'`. */
@@ -57,7 +62,7 @@ export interface UseCoachResult {
 const DEFAULT_EVAL_DEPTH = 10
 
 export function useCoach(opts: UseCoachOptions): UseCoachResult {
-  const { game, engine, engineReady, mode, userColor } = opts
+  const { game, engineReady, mode, userColor } = opts
   const evalDepth = opts.evalDepth ?? DEFAULT_EVAL_DEPTH
 
   const [threats, setThreats] = useState<ThreatenedPiece[]>([])
@@ -91,7 +96,8 @@ export function useCoach(opts: UseCoachOptions): UseCoachResult {
       setThinking(false)
       return
     }
-    if (!engine || !engineReady) return
+    if (!engineReady) return
+    const engine = getAnalysisEngine()
 
     const history = game.history
     const lastMove = history[history.length - 1]
@@ -180,7 +186,7 @@ export function useCoach(opts: UseCoachOptions): UseCoachResult {
     return () => {
       cancelled = true
     }
-  }, [game.fen, game.history, mode, userColor, engine, engineReady, evalDepth])
+  }, [game.fen, game.history, mode, userColor, engineReady, evalDepth])
 
   const dismissAlert = useMemo(
     () => (): void => {

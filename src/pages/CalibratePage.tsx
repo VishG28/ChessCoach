@@ -114,9 +114,14 @@ export function CalibratePage() {
             <code>UCI_Elo</code>.
           </p>
           <p>
-            The Phase 3A Stockfish weakening table was removed because it was not
-            empirically validated against any rated-player baseline. For sub-1100 play,
-            use{' '}
+            <em>Historical note:</em> an earlier Phase&nbsp;3A Stockfish
+            handicap table (depth caps, MultiPV pools, random and tactical-error
+            rolls) was removed on 2026-05-17 because it was never empirically
+            validated against any rated-player baseline. Today the opponent is
+            exactly Maia (1100&ndash;1899) or Stockfish with{' '}
+            <code>UCI_LimitStrength</code> (1900+); no extra randomization is
+            layered on top. For
+            sub-1100 play, use{' '}
             <a
               href="https://lichess.org"
               target="_blank"
