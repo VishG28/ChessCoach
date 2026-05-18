@@ -215,10 +215,14 @@ body,
 }
 
 /* Chessground board color overrides.
-   chessground.brown.css bakes square colors into a background-image SVG.
-   We replace the whole background with our tokens: the dark squares become the
-   cg-board background-color; light squares are painted as an SVG fill overlay. */
+   chessground.brown.css bakes square colors into a background-image SVG that
+   we can't recolor with CSS variables. We override with a pure CSS gradient
+   checkerboard sized to the 8x8 grid so both square colors track our tokens. */
 cg-board {
-  background-color: var(--board-dark);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8' shape-rendering='crispEdges'%3E%3Cg id='a'%3E%3Cg id='b'%3E%3Cg id='c'%3E%3Cg id='d'%3E%3Crect width='1' height='1' id='e' fill='transparent'/%3E%3Cuse x='1' y='1' href='%23e'/%3E%3Crect y='1' width='1' height='1' id='f' fill='white' fill-opacity='0.35'/%3E%3Cuse x='1' y='-1' href='%23f'/%3E%3C/g%3E%3Cuse x='2' href='%23d'/%3E%3C/g%3E%3Cuse x='4' href='%23c'/%3E%3C/g%3E%3Cuse y='2' href='%23b'/%3E%3C/g%3E%3Cuse y='4' href='%23a'/%3E%3C/svg%3E");
+  background-color: var(--board-light);
+  background-image:
+    linear-gradient(45deg, var(--board-dark) 25%, transparent 25%, transparent 75%, var(--board-dark) 75%),
+    linear-gradient(45deg, var(--board-dark) 25%, transparent 25%, transparent 75%, var(--board-dark) 75%);
+  background-size: 25% 25%;
+  background-position: 0 0, 12.5% 12.5%;
 }
