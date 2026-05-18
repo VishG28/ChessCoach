@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { EngineDebugState, EngineEval, EngineMove, TopCandidate } from './types'
-import { getWeakeningParams } from './weakening'
+import { resolveEngine, STOCKFISH_THRESHOLD } from './engineRouting'
 
 const WORKER_URL = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/engine/stockfish-18-lite-single.js`
 const MATE_SCORE = 100000
@@ -143,34 +143,39 @@ export class Engine {
   }
 
   setStrength(elo: number): Promise<void> {
-    const p = getWeakeningParams(elo)
-    const skill = p.useUciLimit ? 20 : 0
+    const r = resolveEngine(elo)
+    const useUciLimit = r.source === 'stockfish'
+    const uciElo = r.sfElo ?? STOCKFISH_THRESHOLD
+    const depth = r.sfDepth ?? 14
+    const movetime = r.sfMovetimeMs ?? 1000
+    const multipv = 1
+    const skill = 20
 
     const cmds: string[] = [
-      `setoption name MultiPV value ${p.multipv}`,
+      `setoption name MultiPV value ${multipv}`,
       `setoption name Skill Level value ${skill}`,
-      `setoption name UCI_LimitStrength value ${p.useUciLimit}`,
+      `setoption name UCI_LimitStrength value ${useUciLimit}`,
     ]
-    if (p.useUciLimit) {
-      cmds.push(`setoption name UCI_Elo value ${p.uciElo}`)
+    if (useUciLimit) {
+      cmds.push(`setoption name UCI_Elo value ${uciElo}`)
     }
     cmds.push('isready')
 
-    this.currentMultipv = p.multipv
+    this.currentMultipv = multipv
 
     const updatedCommands = [...this.debugState.lastCommands, ...cmds].slice(-LAST_COMMANDS_MAX)
     this.updateDebug({
       elo,
       skill,
-      depth: p.depth,
-      movetime: p.movetime,
-      multipv: p.multipv,
-      randomness: p.randomMoveChance,
+      depth,
+      movetime,
+      multipv,
+      randomness: 0,
       lastCommands: updatedCommands,
     })
 
     if (import.meta.env.DEV) {
-      console.info('[engine] setStrength', { elo, skill, depth: p.depth, movetime: p.movetime, multipv: p.multipv, useUciLimit: p.useUciLimit })
+      console.info('[engine] setStrength', { elo, source: r.source, depth, movetime, multipv, useUciLimit, uciElo })
     }
 
     return this.enqueue('ready', cmds) as Promise<void>

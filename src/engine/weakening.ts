@@ -1,3 +1,18 @@
+/**
+ * @deprecated 2026-05-17 — DO NOT USE for new code.
+ *
+ * The Phase 3A weakening pipeline below (depth ceilings, multipv pools,
+ * random-move rolls, blunder rolls) was never empirically validated against
+ * any rated-player baseline. The opponent move pipeline now routes through
+ * `engineRouting.resolveEngine(elo)`:
+ *   • 1100 ≤ elo < 1900  → Maia neural net
+ *   • elo ≥ 1900          → Stockfish with UCI_LimitStrength + UCI_Elo
+ *
+ * This file is kept for historical reference (and the still-imported
+ * `humanThinkDelay()` thinking-pause helper). Do not re-introduce these
+ * params into the play loop.
+ */
+
 export interface WeakeningParams {
   depth: number
   movetime: number
