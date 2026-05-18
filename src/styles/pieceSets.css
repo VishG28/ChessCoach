@@ -1,0 +1,80 @@
+/*
+ * pieceSets.css — Piece set overrides for chessground
+ *
+ * Chessground renders pieces as: <piece class="<role> <color>"> inside <cg-board>
+ * We scope all overrides under .cg-piece-set-<id> on <html>, applied by PieceSetProvider.
+ *
+ * We use background-size: 100% 100% (not transform: scale) because chessground
+ * uses translate3d for piece animations — scaling via transform would compound with
+ * those animations and break positioning.
+ */
+
+/* Shared base: all pieces use background-image rendering */
+piece {
+  background-size: 100% 100%;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+/* ─── standard (cburnett) ──────────────────────────────────────────────────── */
+
+.cg-piece-set-standard cg-board piece.king.white   { background-image: url('/pieces/cburnett/wK.svg'); }
+.cg-piece-set-standard cg-board piece.queen.white  { background-image: url('/pieces/cburnett/wQ.svg'); }
+.cg-piece-set-standard cg-board piece.rook.white   { background-image: url('/pieces/cburnett/wR.svg'); }
+.cg-piece-set-standard cg-board piece.bishop.white { background-image: url('/pieces/cburnett/wB.svg'); }
+.cg-piece-set-standard cg-board piece.knight.white { background-image: url('/pieces/cburnett/wN.svg'); }
+.cg-piece-set-standard cg-board piece.pawn.white   { background-image: url('/pieces/cburnett/wP.svg'); }
+.cg-piece-set-standard cg-board piece.king.black   { background-image: url('/pieces/cburnett/bK.svg'); }
+.cg-piece-set-standard cg-board piece.queen.black  { background-image: url('/pieces/cburnett/bQ.svg'); }
+.cg-piece-set-standard cg-board piece.rook.black   { background-image: url('/pieces/cburnett/bR.svg'); }
+.cg-piece-set-standard cg-board piece.bishop.black { background-image: url('/pieces/cburnett/bB.svg'); }
+.cg-piece-set-standard cg-board piece.knight.black { background-image: url('/pieces/cburnett/bN.svg'); }
+.cg-piece-set-standard cg-board piece.pawn.black   { background-image: url('/pieces/cburnett/bP.svg'); }
+
+/* ─── loco (fantasy) ───────────────────────────────────────────────────────── */
+
+.cg-piece-set-loco cg-board piece.king.white   { background-image: url('/pieces/fantasy/wK.svg'); }
+.cg-piece-set-loco cg-board piece.queen.white  { background-image: url('/pieces/fantasy/wQ.svg'); }
+.cg-piece-set-loco cg-board piece.rook.white   { background-image: url('/pieces/fantasy/wR.svg'); }
+.cg-piece-set-loco cg-board piece.bishop.white { background-image: url('/pieces/fantasy/wB.svg'); }
+.cg-piece-set-loco cg-board piece.knight.white { background-image: url('/pieces/fantasy/wN.svg'); }
+.cg-piece-set-loco cg-board piece.pawn.white   { background-image: url('/pieces/fantasy/wP.svg'); }
+.cg-piece-set-loco cg-board piece.king.black   { background-image: url('/pieces/fantasy/bK.svg'); }
+.cg-piece-set-loco cg-board piece.queen.black  { background-image: url('/pieces/fantasy/bQ.svg'); }
+.cg-piece-set-loco cg-board piece.rook.black   { background-image: url('/pieces/fantasy/bR.svg'); }
+.cg-piece-set-loco cg-board piece.bishop.black { background-image: url('/pieces/fantasy/bB.svg'); }
+.cg-piece-set-loco cg-board piece.knight.black { background-image: url('/pieces/fantasy/bN.svg'); }
+.cg-piece-set-loco cg-board piece.pawn.black   { background-image: url('/pieces/fantasy/bP.svg'); }
+
+/* Loco-only: slightly oversized to match the chunky fantasy style */
+.cg-piece-set-loco cg-board piece { background-size: 110% 110%; }
+
+/* ─── classic (merida) ─────────────────────────────────────────────────────── */
+
+.cg-piece-set-classic cg-board piece.king.white   { background-image: url('/pieces/merida/wK.svg'); }
+.cg-piece-set-classic cg-board piece.queen.white  { background-image: url('/pieces/merida/wQ.svg'); }
+.cg-piece-set-classic cg-board piece.rook.white   { background-image: url('/pieces/merida/wR.svg'); }
+.cg-piece-set-classic cg-board piece.bishop.white { background-image: url('/pieces/merida/wB.svg'); }
+.cg-piece-set-classic cg-board piece.knight.white { background-image: url('/pieces/merida/wN.svg'); }
+.cg-piece-set-classic cg-board piece.pawn.white   { background-image: url('/pieces/merida/wP.svg'); }
+.cg-piece-set-classic cg-board piece.king.black   { background-image: url('/pieces/merida/bK.svg'); }
+.cg-piece-set-classic cg-board piece.queen.black  { background-image: url('/pieces/merida/bQ.svg'); }
+.cg-piece-set-classic cg-board piece.rook.black   { background-image: url('/pieces/merida/bR.svg'); }
+.cg-piece-set-classic cg-board piece.bishop.black { background-image: url('/pieces/merida/bB.svg'); }
+.cg-piece-set-classic cg-board piece.knight.black { background-image: url('/pieces/merida/bN.svg'); }
+.cg-piece-set-classic cg-board piece.pawn.black   { background-image: url('/pieces/merida/bP.svg'); }
+
+/* ─── minimal (alpha) ──────────────────────────────────────────────────────── */
+
+.cg-piece-set-minimal cg-board piece.king.white   { background-image: url('/pieces/alpha/wK.svg'); }
+.cg-piece-set-minimal cg-board piece.queen.white  { background-image: url('/pieces/alpha/wQ.svg'); }
+.cg-piece-set-minimal cg-board piece.rook.white   { background-image: url('/pieces/alpha/wR.svg'); }
+.cg-piece-set-minimal cg-board piece.bishop.white { background-image: url('/pieces/alpha/wB.svg'); }
+.cg-piece-set-minimal cg-board piece.knight.white { background-image: url('/pieces/alpha/wN.svg'); }
+.cg-piece-set-minimal cg-board piece.pawn.white   { background-image: url('/pieces/alpha/wP.svg'); }
+.cg-piece-set-minimal cg-board piece.king.black   { background-image: url('/pieces/alpha/bK.svg'); }
+.cg-piece-set-minimal cg-board piece.queen.black  { background-image: url('/pieces/alpha/bQ.svg'); }
+.cg-piece-set-minimal cg-board piece.rook.black   { background-image: url('/pieces/alpha/bR.svg'); }
+.cg-piece-set-minimal cg-board piece.bishop.black { background-image: url('/pieces/alpha/bB.svg'); }
+.cg-piece-set-minimal cg-board piece.knight.black { background-image: url('/pieces/alpha/bN.svg'); }
+.cg-piece-set-minimal cg-board piece.pawn.black   { background-image: url('/pieces/alpha/bP.svg'); }

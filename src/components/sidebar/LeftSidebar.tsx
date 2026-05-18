@@ -12,6 +12,29 @@ import { Slider } from '@/components/ui/slider'
 import { Switch } from '@/components/ui/switch'
 import { cn } from '@/lib/utils'
 import type { CoachingStyle } from '@/coaching/deepCoach'
+import { BoardThemeCard } from '@/components/sidebar/BoardThemeCard'
+import { PieceSetCard } from '@/components/sidebar/PieceSetCard'
+import { useBoardTheme } from '@/components/board/BoardThemeProvider'
+import { usePieceSet } from '@/components/board/PieceSetProvider'
+
+function ResetAppearanceButton() {
+  const { setThemeId } = useBoardTheme()
+  const { setSetId } = usePieceSet()
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      className="w-full text-xs"
+      onClick={() => {
+        setThemeId('classic')
+        setSetId('standard')
+      }}
+    >
+      Reset Board Appearance
+    </Button>
+  )
+}
 
 export type UserColor = 'white' | 'black' | 'random'
 export type CoachMode = 'off' | 'warnings' | 'full'
@@ -81,6 +104,7 @@ export function LeftSidebar({
   const premovesDisabled = coachMode === 'full'
 
   return (
+    <>
     <Card className="w-full">
       <CardHeader>
         <CardTitle className="text-base tracking-tight">Play</CardTitle>
@@ -318,5 +342,9 @@ export function LeftSidebar({
         </div>
       </CardContent>
     </Card>
+    <BoardThemeCard />
+    <PieceSetCard />
+    <ResetAppearanceButton />
+    </>
   )
 }

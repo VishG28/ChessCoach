@@ -8,6 +8,7 @@
     "build": "bash scripts/copy-ort.sh && tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
+    "test": "node --test --experimental-strip-types 'src/**/*.test.ts'",
     "openings:generate": "tsx scripts/generateOpenings.ts",
     "openings:dummy": "tsx scripts/buildDummyOpenings.ts"
   },
