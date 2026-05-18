@@ -19,7 +19,7 @@
 import { getBookMove } from './openingBook'
 import { requestMaiaMove, maiaModelName } from './maia'
 import { resolveEngine } from './engineRouting'
-import type { Engine } from './engine'
+import { getOpponentEngine } from './workerPool'
 import type { MoveSource } from '@/games/types'
 
 /**
@@ -36,7 +36,6 @@ export interface OpponentMoveResult {
 }
 
 export interface OpponentMoveOptions {
-  engine: Engine
   fen: string
   /** 1-based count of plies played so far. */
   ply: number
@@ -49,7 +48,7 @@ const MAIA_LOW_ELO_BOOK_MAX_PLY = 16    // 8 full moves for sub-1400
 export async function requestOpponentMove(
   opts: OpponentMoveOptions,
 ): Promise<OpponentMoveResult> {
-  const { engine, fen, ply, elo } = opts
+  const { fen, ply, elo } = opts
   const resolved = resolveEngine(elo)
 
   const bookPlyLimit =
@@ -83,7 +82,8 @@ export async function requestOpponentMove(
 
   const depth = resolved.sfDepth ?? 14
   const movetime = resolved.sfMovetimeMs ?? 1000
-  const engineMove = await engine.requestMove({ fen, depth, movetime, multipv: 1 })
+  const opponentEngine = getOpponentEngine()
+  const engineMove = await opponentEngine.requestMove({ fen, depth, movetime, multipv: 1 })
   const uci = `${engineMove.from}${engineMove.to}${engineMove.promotion ?? ''}`
   return {
     uci,

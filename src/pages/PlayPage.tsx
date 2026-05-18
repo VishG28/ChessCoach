@@ -20,7 +20,14 @@ import { useCoach } from '@/coaching/useCoach'
 import { useApiKey } from '@/coaching/apiKey'
 import { useExplain } from '@/coaching/useExplain'
 import type { BlunderContext } from '@/coaching/llmCoach'
-import { useEngine, parseUciMove } from '@/engine/engine'
+import { parseUciMove } from '@/engine/engine'
+import type { Engine } from '@/engine/engine'
+import {
+  ensurePoolReady,
+  getOpponentEngine,
+  setOpponentElo,
+  teardownEngines,
+} from '@/engine/workerPool'
 import { useChessGame } from '@/lib/useChessGame'
 import { humanThinkDelay } from '@/engine/thinkDelay'
 import { useGameLogger, type OpponentMoveMeta } from '@/games/useGameLogger'
@@ -62,7 +69,35 @@ function resolveUserColor(choice: UserColor): 'white' | 'black' {
 
 export function PlayPage() {
   const game = useChessGame()
-  const { engine, ready } = useEngine()
+  // Engine pool: two isolated singletons (opponent + analysis). The opponent
+  // engine drives `requestOpponentMove`; the analysis engine drives `useCoach`
+  // silent evals and `useGameLogger.analyzePosition`. See workerPool.ts and
+  // ENGINE_WORKER_AUDIT.md for the rationale.
+  const [engine, setEngine] = useState<Engine | null>(null)
+  const [ready, setReady] = useState(false)
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      await ensurePoolReady()
+      if (cancelled) return
+      const opp = getOpponentEngine()
+      setEngine(opp)
+      try {
+        // Lifting setStrength out so the first opponent move sees the right Elo.
+        await setOpponentElo(DEFAULT_ELO)
+      } catch {
+        // Init failures are handled per-call below; we still flag ready=true so
+        // the UI doesn't stay in a perpetual "loading" state.
+      }
+      if (cancelled) return
+      setReady(true)
+    })()
+    return () => {
+      cancelled = true
+      // Teardown both pool engines (and their underlying Workers) on unmount.
+      teardownEngines()
+    }
+  }, [])
   const location = useLocation()
 
   const [elo, setElo] = useState(DEFAULT_ELO)
@@ -155,16 +190,20 @@ export function PlayPage() {
   // Power-user keyboard shortcuts (all auto-skipped when typing in inputs)
   useShortcut('`', () => setDebugOpen((v) => !v))
 
-  // Push strength to the engine whenever it changes (and once on ready).
+  // Push strength to the opponent engine whenever it changes (and once on
+  // ready). The analysis engine is intentionally NOT reconfigured — it stays
+  // at full strength to give the coach objective evals regardless of opponent
+  // Elo. See workerPool.setOpponentElo.
   useEffect(() => {
     if (!engine || !ready) return
-    void engine.setStrength(elo)
+    void setOpponentElo(elo)
   }, [engine, ready, elo])
 
-  // Coach reads game + engine and produces threats/captures/blunder alerts.
+  // Coach reads game + the pool's analysis engine and produces
+  // threats/captures/blunder alerts. The analysis engine is isolated from the
+  // opponent engine — see workerPool.ts.
   const coach = useCoach({
     game,
-    engine,
     engineReady: ready,
     mode: coachMode,
     userColor,
@@ -413,8 +452,8 @@ export function PlayPage() {
         void evalCp
 
         // Unified opponent move pipeline: book → maia (with Stockfish fallback) → Stockfish.
+        // The opponent engine comes from the pool internally; no engine arg.
         const result = await requestOpponentMove({
-          engine,
           fen: fenBefore,
           ply,
           elo,
