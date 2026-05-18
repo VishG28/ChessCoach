@@ -90,7 +90,7 @@ function PracticeTab({ opening }: PracticeTabProps) {
     : []
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-[420px_1fr] gap-6 items-start">
+    <div className="grid grid-cols-1 lg:grid-cols-[560px_minmax(0,1fr)] gap-6 items-start">
       <div className="flex flex-col gap-4">
         <Board
           fen={fen}
@@ -316,7 +316,7 @@ export function OpeningDetailPage() {
 
         {/* Main Line tab */}
         <TabsContent value="main-line">
-          <div className="grid grid-cols-1 md:grid-cols-[360px_1fr] gap-6 items-start">
+          <div className="grid grid-cols-1 lg:grid-cols-[560px_minmax(0,1fr)] gap-6 items-start">
             <div className="flex flex-col gap-4">
               <Board
                 fen={boardFen}
