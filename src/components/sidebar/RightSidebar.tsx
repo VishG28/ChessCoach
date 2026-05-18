@@ -29,6 +29,12 @@ export interface RightSidebarProps {
    * into `history`). When `source === 'book'` a 📖 badge is rendered.
    */
   moveSources?: ReadonlyMap<number, MoveSourceInfo>
+  /**
+   * Optional click handler for the move list. Receives the 0-based ply index
+   * into `history` for the move that was clicked. When omitted, plies render
+   * as non-interactive labels.
+   */
+  onSelectPly?: (ply: number) => void
 }
 
 /** Convert centipawn evaluation to White's share (0..1) using a logistic. */
@@ -80,6 +86,7 @@ export function RightSidebar({
   mateIn = null,
   activePly = null,
   moveSources,
+  onSelectPly,
 }: RightSidebarProps) {
   const share = evalToWhiteShare(evalCpWhitePov, mateIn)
   const whitePct = Math.max(0, Math.min(1, share)) * 100
@@ -151,6 +158,7 @@ export function RightSidebar({
                       sourceInfo={
                         pair.whitePly != null ? moveSources?.get(pair.whitePly) : undefined
                       }
+                      onSelectPly={onSelectPly}
                     />
                     <PlyCell
                       move={pair.black}
@@ -159,6 +167,7 @@ export function RightSidebar({
                       sourceInfo={
                         pair.blackPly != null ? moveSources?.get(pair.blackPly) : undefined
                       }
+                      onSelectPly={onSelectPly}
                     />
                   </li>
                 ))}
@@ -176,14 +185,16 @@ interface PlyCellProps {
   ply: number | null
   activePly: number | null
   sourceInfo?: MoveSourceInfo
+  onSelectPly?: (ply: number) => void
 }
 
-function PlyCell({ move, ply, activePly, sourceInfo }: PlyCellProps) {
+function PlyCell({ move, ply, activePly, sourceInfo, onSelectPly }: PlyCellProps) {
   if (move == null || ply == null) {
     return <span className="text-muted-foreground">·</span>
   }
   const isActive = activePly === ply
   const isBook = sourceInfo?.source === 'book'
+  const interactive = Boolean(onSelectPly)
   return (
     <button
       type="button"
@@ -192,8 +203,11 @@ function PlyCell({ move, ply, activePly, sourceInfo }: PlyCellProps) {
         isActive
           ? 'bg-foreground text-background'
           : 'text-foreground hover:bg-muted',
+        interactive ? 'cursor-pointer' : 'cursor-default',
       )}
       data-ply={ply}
+      aria-current={isActive ? 'true' : undefined}
+      onClick={onSelectPly ? () => onSelectPly(ply) : undefined}
     >
       {move.san}
       {isBook && (
