@@ -1,6 +1,6 @@
 import type { JSX } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import { BOARD_THEMES, type BoardThemeId } from '@/styles/boardThemes'
 import { marbleIndex } from '@/lib/marbleHash'
@@ -39,33 +39,31 @@ function MiniBoard({ id }: { id: BoardThemeId }) {
 export function BoardThemeCard() {
   const { themeId, setThemeId } = useBoardTheme()
   return (
-    <TooltipProvider>
-      <Card className="w-full">
-        <CardHeader><CardTitle className="text-base tracking-tight">Board Theme</CardTitle></CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-3 gap-3">
-            {(Object.keys(BOARD_THEMES) as BoardThemeId[]).map((id) => {
-              const theme = BOARD_THEMES[id]
-              const active = themeId === id
-              return (
-                <Tooltip key={id}>
-                  <TooltipTrigger asChild>
-                    <button type="button" onClick={() => setThemeId(id)} aria-pressed={active}
-                      className={cn(
-                        'flex flex-col items-center gap-1 rounded-md p-1.5 transition-colors',
-                        active ? 'border-2 border-primary bg-accent/40' : 'border-2 border-transparent hover:bg-accent/30',
-                      )}>
-                      <MiniBoard id={id} />
-                      <span className="text-xs font-medium">{theme.name}</span>
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent>{theme.description}</TooltipContent>
-                </Tooltip>
-              )
-            })}
-          </div>
-        </CardContent>
-      </Card>
-    </TooltipProvider>
+    <Card className="w-full">
+      <CardHeader><CardTitle className="text-base tracking-tight">Board Theme</CardTitle></CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-3 gap-3">
+          {(Object.keys(BOARD_THEMES) as BoardThemeId[]).map((id) => {
+            const theme = BOARD_THEMES[id]
+            const active = themeId === id
+            return (
+              <Tooltip key={id}>
+                <TooltipTrigger asChild>
+                  <button type="button" onClick={() => setThemeId(id)} aria-pressed={active}
+                    className={cn(
+                      'flex flex-col items-center gap-1 rounded-md p-1.5 transition-colors',
+                      active ? 'border-2 border-primary bg-accent/40' : 'border-2 border-transparent hover:bg-accent/30',
+                    )}>
+                    <MiniBoard id={id} />
+                    <span className="text-xs font-medium">{theme.name}</span>
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>{theme.description}</TooltipContent>
+              </Tooltip>
+            )
+          })}
+        </div>
+      </CardContent>
+    </Card>
   )
 }

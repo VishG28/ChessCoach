@@ -5,7 +5,7 @@ import type { Game, MoveEntry } from '@/games/types'
 import { CLASS_BG, CLASS_LABEL } from '@/games/classification'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useApiKey } from '@/coaching/apiKey'
 import { useExplain } from '@/coaching/useExplain'
 import type { BlunderContext } from '@/coaching/llmCoach'
@@ -267,28 +267,26 @@ export function MoveDetails({
         >
           Play from here
         </Button>
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setTriggered(true)}
-                  disabled={triggered && explain.loading}
-                  title="Get an AI explanation of this move"
-                >
-                  Explain this move
-                </Button>
-              </span>
-            </TooltipTrigger>
-            {!hasKey && (
-              <TooltipContent>
-                Add your Anthropic API key to enable explanations
-              </TooltipContent>
-            )}
-          </Tooltip>
-        </TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setTriggered(true)}
+                disabled={triggered && explain.loading}
+                title="Get an AI explanation of this move"
+              >
+                Explain this move
+              </Button>
+            </span>
+          </TooltipTrigger>
+          {!hasKey && (
+            <TooltipContent>
+              Add your Anthropic API key to enable explanations
+            </TooltipContent>
+          )}
+        </Tooltip>
       </div>
       {triggered && (
         <div className="mt-2">
