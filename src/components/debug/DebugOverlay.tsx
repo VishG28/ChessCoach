@@ -4,6 +4,8 @@ import { Separator } from '@/components/ui/separator'
 import type { Engine } from '@/engine/engine'
 import type { EngineDebugState } from '@/engine/types'
 import { resolveEngine } from '@/engine/engineRouting'
+import { useCostCounter } from '@/coaching/costCounter'
+import { formatUSD } from '@/coaching/cost'
 
 interface DebugOverlayProps {
   engine: Engine
@@ -12,6 +14,15 @@ interface DebugOverlayProps {
 
 export function DebugOverlay({ engine, elo }: DebugOverlayProps) {
   const [state, setState] = useState<EngineDebugState>(() => engine.getDebugState())
+  const {
+    usd,
+    usdWithoutCache,
+    inputTokens,
+    outputTokens,
+    cacheCreationTokens,
+    cacheReadTokens,
+    callCount,
+  } = useCostCounter()
 
   useEffect(() => {
     return engine.onDebug(setState)
@@ -19,6 +30,7 @@ export function DebugOverlay({ engine, elo }: DebugOverlayProps) {
 
   const resolved = resolveEngine(elo)
   const isStockfish = resolved.source === 'stockfish'
+  const saved = Math.max(0, usdWithoutCache - usd)
 
   return (
     <Card className="fixed bottom-4 right-4 z-50 w-80 p-3 font-mono text-xs bg-card text-card-foreground border-border shadow-xl">
@@ -102,6 +114,30 @@ export function DebugOverlay({ engine, elo }: DebugOverlayProps) {
       <div className="text-muted-foreground max-h-24 overflow-auto whitespace-pre-wrap">
         {state.lastCommands.slice(-8).join('\n')}
       </div>
+      {callCount > 0 && (
+        <>
+          <Separator className="my-2 bg-border" />
+          <div className="font-semibold mb-1">Coach prompt-cache</div>
+          <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-muted-foreground">
+            <span>calls</span>
+            <span className="text-right text-foreground">{callCount}</span>
+            <span>input tok</span>
+            <span className="text-right">{inputTokens.toLocaleString()}</span>
+            <span>output tok</span>
+            <span className="text-right">{outputTokens.toLocaleString()}</span>
+            <span>cache write tok</span>
+            <span className="text-right">{cacheCreationTokens.toLocaleString()}</span>
+            <span>cache read tok</span>
+            <span className="text-right text-emerald-300">
+              {cacheReadTokens.toLocaleString()}
+            </span>
+            <span>spent</span>
+            <span className="text-right text-foreground">{formatUSD(usd)}</span>
+            <span>saved</span>
+            <span className="text-right text-emerald-300">{formatUSD(saved)}</span>
+          </div>
+        </>
+      )}
     </Card>
   )
 }
