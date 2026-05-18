@@ -23,7 +23,7 @@ type TestState = 'idle' | 'testing' | 'ok' | 'fail'
 const KEEP_COACHING_KEY = 'cc.keepCoaching.v1'
 
 export function ApiKeyDialog({ open, onOpenChange }: ApiKeyDialogProps) {
-  const { setKey } = useApiKey()
+  const { setKey, markVerified } = useApiKey()
   const [value, setValue] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [test, setTest] = useState<TestState>('idle')
@@ -69,7 +69,11 @@ export function ApiKeyDialog({ open, onOpenChange }: ApiKeyDialogProps) {
       setError("This doesn't look like a valid Anthropic key. It should start with sk-ant-")
       return
     }
+    const wasTested = test === 'ok'
     setKey(clean)
+    // setKey resets verified to false; if the user verified this key in this
+    // dialog session, re-mark it as verified so the indicator shows green.
+    if (wasTested) markVerified()
     try { localStorage.setItem(KEEP_COACHING_KEY, keepCoaching ? '1' : '0') } catch {}
     setValue('')
     setError(null)

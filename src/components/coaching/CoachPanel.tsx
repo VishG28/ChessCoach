@@ -21,6 +21,8 @@ import { TellMoreButton } from './TellMoreButton'
 
 export interface CoachPanelProps {
   mode: 'off' | 'warnings' | 'full'
+  /** True when the user has entered an Anthropic API key. Drives the missing-key prompt in Full mode. */
+  hasKey?: boolean
   threats: ThreatenedPiece[]
   captures: AvailableCapture[]
   blunderAlert: BlunderAlert | null
@@ -79,6 +81,7 @@ const MODE_LABEL: Record<CoachPanelProps['mode'], string> = {
 
 export function CoachPanel({
   mode,
+  hasKey,
   threats,
   captures,
   blunderAlert,
@@ -104,7 +107,7 @@ export function CoachPanel({
   void onQuieter
 
   return (
-    <Card className="w-[560px]">
+    <Card className="w-full max-w-[560px]">
       <CardHeader>
         <div className="flex items-center justify-between gap-3">
           <CardTitle className="text-base tracking-tight">Coach</CardTitle>
@@ -184,6 +187,11 @@ export function CoachPanel({
               onTakeBack={onTakeBackBlunder}
               explain={explain}
             />
+            {mode === 'full' && !hasKey && (
+              <p className="text-xs italic text-muted-foreground">
+                Add your Anthropic API key for AI-powered coaching.
+              </p>
+            )}
           </>
         )}
       </CardContent>

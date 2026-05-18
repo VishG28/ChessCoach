@@ -14,11 +14,19 @@ cg-board {
 
 :root:not([data-board-mode='marble']) cg-board {
   background-color: var(--cc-board-light);
+  /* Conic-gradient tiles a 2-square × 2-square unit producing a true
+     checkerboard. With the default center at 50% 50%, the bottom-left
+     quadrant of each tile is dark so a1 (bottom-left of the board) lands
+     on a dark square as required by chess rules. */
   background-image:
-    linear-gradient(45deg, var(--cc-board-dark) 25%, transparent 25%, transparent 75%, var(--cc-board-dark) 75%),
-    linear-gradient(45deg, var(--cc-board-dark) 25%, transparent 25%, transparent 75%, var(--cc-board-dark) 75%);
+    conic-gradient(
+      var(--cc-board-dark) 0deg 90deg,
+      var(--cc-board-light) 90deg 180deg,
+      var(--cc-board-dark) 180deg 270deg,
+      var(--cc-board-light) 270deg 360deg
+    );
   background-size: 25% 25%;
-  background-position: 0 0, 12.5% 12.5%;
+  background-position: 0 0;
 }
 
 :root[data-board-mode='marble'] cg-board {
@@ -32,10 +40,14 @@ cg-board {
   background-image:
     repeating-linear-gradient(90deg, rgba(60, 30, 10, 0.06) 0 1px, transparent 1px 6px),
     repeating-linear-gradient(78deg, rgba(255, 230, 200, 0.04) 0 2px, transparent 2px 14px),
-    linear-gradient(45deg, var(--cc-board-dark) 25%, transparent 25%, transparent 75%, var(--cc-board-dark) 75%),
-    linear-gradient(45deg, var(--cc-board-dark) 25%, transparent 25%, transparent 75%, var(--cc-board-dark) 75%);
-  background-size: 100% 100%, 100% 100%, 25% 25%, 25% 25%;
-  background-position: 0 0, 0 0, 0 0, 12.5% 12.5%;
+    conic-gradient(
+      var(--cc-board-dark) 0deg 90deg,
+      var(--cc-board-light) 90deg 180deg,
+      var(--cc-board-dark) 180deg 270deg,
+      var(--cc-board-light) 270deg 360deg
+    );
+  background-size: 100% 100%, 100% 100%, 25% 25%;
+  background-position: 0 0, 0 0, 0 0;
 }
 
 .cg-wrap square.selected      { background-color: var(--cc-board-selected); }

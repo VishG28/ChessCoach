@@ -9,6 +9,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
 import { cn } from '@/lib/utils'
 import type { MoveSource } from '@/games/types'
+import { evalToWhiteShare, formatEval } from '@/lib/evalShare'
 
 export interface MoveSourceInfo {
   source: MoveSource
@@ -35,25 +36,6 @@ export interface RightSidebarProps {
    * as non-interactive labels.
    */
   onSelectPly?: (ply: number) => void
-}
-
-/** Convert centipawn evaluation to White's share (0..1) using a logistic. */
-function evalToWhiteShare(cp: number | null, mateIn?: number | null): number {
-  if (mateIn != null) return mateIn > 0 ? 1 : 0
-  if (cp == null) return 0.5
-  return 1 / (1 + Math.pow(10, -cp / 400))
-}
-
-/** Pretty-print the eval as `+0.32`, `-1.40`, or `M3` / `-M3`. */
-function formatEval(cp: number | null, mateIn?: number | null): string {
-  if (mateIn != null) {
-    if (mateIn === 0) return 'M'
-    return mateIn > 0 ? `M${mateIn}` : `-M${Math.abs(mateIn)}`
-  }
-  if (cp == null) return '—'
-  const pawns = cp / 100
-  const sign = pawns > 0 ? '+' : pawns < 0 ? '−' : ''
-  return `${sign}${Math.abs(pawns).toFixed(2)}`
 }
 
 interface MovePair {
@@ -115,7 +97,8 @@ export function RightSidebar({
             </span>
           </div>
           <div
-            className="relative h-3 overflow-hidden rounded-full bg-foreground ring-1 ring-inset ring-black/10"
+            className="relative h-5 overflow-hidden rounded-md ring-1 ring-inset ring-black/15"
+            style={{ backgroundColor: 'var(--cc-board-dark)' }}
             role="meter"
             aria-label="Position evaluation, White's share"
             aria-valuemin={0}
@@ -123,10 +106,22 @@ export function RightSidebar({
             aria-valuenow={Math.round(whitePct)}
           >
             <div
-              className="absolute inset-y-0 right-0 bg-white transition-all duration-300 ease-out"
-              style={{ width: `${whitePct}%` }}
+              className="absolute inset-y-0 left-0 transition-[width] duration-300 ease-out"
+              style={{
+                width: `${whitePct}%`,
+                backgroundColor: 'var(--cc-board-light)',
+              }}
             />
-            <div className="pointer-events-none absolute left-1/2 top-0 h-full w-px bg-muted-foreground/40" />
+            <div
+              className="pointer-events-none absolute top-0 h-full w-px"
+              style={{ left: '50%', backgroundColor: 'rgba(0,0,0,0.25)' }}
+            />
+            <span
+              className="pointer-events-none absolute inset-0 flex items-center justify-center font-mono text-[0.7rem] font-semibold tabular-nums text-foreground mix-blend-difference"
+              aria-hidden="true"
+            >
+              {evalLabel}
+            </span>
           </div>
         </section>
 

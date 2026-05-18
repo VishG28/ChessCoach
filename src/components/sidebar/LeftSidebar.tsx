@@ -247,19 +247,27 @@ export function LeftSidebar({
               className="space-y-2"
             >
               {[
-                { v: 'conversational', t: 'Conversational', d: 'Strong player thinking out loud, 4-8 sentences.' },
-                { v: 'socratic',       t: 'Socratic',       d: 'Coach asks you questions instead of answering.' },
-                { v: 'tactical',       t: 'Tactical drills', d: 'Pure calculation prompts. One nudge, no spoilers.' },
-              ].map((opt) => (
-                <Label key={opt.v} htmlFor={`cs-${opt.v}`} className={cn(
-                  'flex cursor-pointer flex-col gap-1 rounded-md border p-2 text-sm transition-colors',
-                  (coachingStyle ?? 'conversational') === opt.v ? 'border-primary bg-accent' : 'hover:bg-accent/50',
-                )}>
-                  <RadioGroupItem id={`cs-${opt.v}`} value={opt.v} className="sr-only" />
-                  <span className="font-medium">{opt.t}</span>
-                  <span className="text-xs text-muted-foreground">{opt.d}</span>
-                </Label>
-              ))}
+                { v: 'conversational', t: 'Conversational', d: 'Brief tactical and strategic tips, 1-3 bullets per move.' },
+                { v: 'socratic',       t: 'Socratic',       d: 'Coach asks one question per move instead of giving answers.' },
+                { v: 'tactical',       t: 'Tactical drills', d: 'One-line calculation prompts. Names pieces and squares, not moves.' },
+              ].map((opt) => {
+                const selected = (coachingStyle ?? 'conversational') === opt.v
+                return (
+                  <Label key={opt.v} htmlFor={`cs-${opt.v}`} className={cn(
+                    'flex cursor-pointer flex-col gap-1 rounded-md border p-2.5 text-sm transition-colors',
+                    selected
+                      ? 'border-primary bg-accent text-foreground'
+                      : 'border-border bg-card text-foreground hover:bg-accent/50',
+                  )}>
+                    <RadioGroupItem id={`cs-${opt.v}`} value={opt.v} className="sr-only" />
+                    <span className={cn(
+                      'text-sm font-semibold leading-tight',
+                      selected ? 'text-primary' : 'text-foreground',
+                    )}>{opt.t}</span>
+                    <span className="text-xs leading-snug text-foreground/70">{opt.d}</span>
+                  </Label>
+                )
+              })}
             </RadioGroup>
           </section>
         )}

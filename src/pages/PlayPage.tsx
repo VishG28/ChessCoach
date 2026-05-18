@@ -776,6 +776,7 @@ export function PlayPage() {
         >
           <CoachPanel
             mode={coachMode}
+            hasKey={hasKey}
             threats={coach.threats}
             captures={coach.captures}
             blunderAlert={coach.blunderAlert}
