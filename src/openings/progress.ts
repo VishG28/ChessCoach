@@ -65,6 +65,7 @@ export function recordAttempt(
 }
 
 export function listLeafLines(opening: Opening): OpeningNode[] {
+  if (!opening.root) return []
   const out: OpeningNode[] = []
   const walk = (n: OpeningNode): void => {
     if (n.children.length === 0) {

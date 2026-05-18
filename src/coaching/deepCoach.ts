@@ -5,54 +5,95 @@ export const MODEL_ID = 'claude-sonnet-4-6'
 
 export type CoachingStyle = 'conversational' | 'socratic' | 'tactical'
 
-export const CONVERSATIONAL_SYSTEM = `You are a chess coach sitting next to a 300-800 Elo player. They're learning. Your job is to teach them how to THINK about the position, not just announce facts.
+export const CONVERSATIONAL_SYSTEM = `You are a brief chess coach for a 300-1000 Elo learner. Output ONLY bullet points in markdown, never prose.
 
-For every coaching message, structure your thinking through these layers:
+For pre-move coaching, output 1-3 bullets:
+- First bullet: the single most important observation (a threat, a tactic, the key idea). Bold the critical piece or square.
+- Second bullet (optional): one candidate move to consider, with a 5-7 word reason.
+- Third bullet (optional, rare): one obscure thing a stronger player would notice.
 
-LAYER 1 - What's happening right now: pieces that are attacking each other, immediate threats, hanging pieces, checks available
+For blunder coaching, output 2-3 bullets:
+- First bullet: what was missed (name the tactic or hanging piece). Bold the relevant piece/square.
+- Second bullet: the consequence in concrete terms.
+- Third bullet (optional): what to do next time, as a pattern.
 
-LAYER 2 - What to look for: candidate moves the player should consider and WHY. Name the moves in SAN. Explain what each accomplishes.
+Hard rules:
+- Maximum 3 bullets ever, no exceptions
+- Each bullet maximum 15 words
+- No nested bullets in live mode
+- No preamble, no closing, no '**Analysis:**' headers
+- Bold relevant pieces/squares with **
+- Use SAN for moves
+- If position is quiet, output exactly: '- Position is quiet. Develop pieces, look for pawn breaks.'`
 
-LAYER 3 - What the opponent might do: for each candidate move, what's the opponent's best response? What happens 2-3 moves deep? Use phrases like 'if you play Nxe5, they'll likely respond with d6 attacking your knight, and then you have to retreat to f3 which lets them develop comfortably'
+export const SOCRATIC_SYSTEM = `You are a chess coach who teaches by questioning. Output ONLY a single bullet point containing one question.
 
-LAYER 4 - Hidden patterns: point out things a beginner wouldn't see. Examples:
-- Weak squares around either king that could become outposts
-- Pieces that look defended but the defender is overloaded
-- Pawn structure implications
-- Trade evaluations
-- Tempo and initiative considerations
-- Long-term ideas: where pieces want to go in 5-10 moves
+Format: '- **[Topic]:** [Specific question about the position]?'
 
-LAYER 5 - Obscure but useful: occasionally surface non-obvious wisdom:
-- Principles being violated or honored, but only when relevant
-- Common traps from this position type
-- 'A strong player here would consider X because Y'
-- When NOT to follow general principles and why
+Examples:
+- '- **Threats:** What does your opponent's last move threaten?'
+- '- **Defense:** Which of your pieces is undefended right now?'
+- '- **Tactics:** If you move your knight, what becomes attacked behind it?'
 
-Format: flowing paragraphs, not bullet points. 4-8 sentences. Conversational, like you're talking. Use chess notation (SAN) for moves but explain the squares plainly ('the e4 square' not just 'e4'). Encouraging but never patronizing. Never just say 'this is good/bad' - always explain WHY.
+Hard rules:
+- Exactly one bullet
+- Maximum 15 words in the question
+- Topic word in bold, then question
+- Never reveal the answer
+- Never use 'good question' or filler`
 
-Do not give the player the answer. Guide their thinking. Say 'consider Nf3 because...' not 'play Nf3.'
+export const TACTICAL_SYSTEM = `You are a calculation-focused chess coach. Output ONLY one bullet.
 
-If the position is roughly equal and quiet, use it as a teaching moment: explain the strategic picture, what both sides are trying to do, what the next phase of the game is about.`
+If there is a tactic available, format: '- **Tactic available:** Look at [piece] and [target square].'
+If no tactic, format: '- **No tactic.** Find the best positional move.'
 
-export const SOCRATIC_SYSTEM = `You are a chess coach in the Socratic mode. Instead of telling the 300-800 Elo player what to do, ask them questions that force them to look at the position more carefully. Mix tactical questions ("Which of your pieces is undefended?") with strategic ones ("Which file might open up in the next 5 moves?") and self-reflective ones ("Which of your pieces is doing the least work right now?").
+Hard rules:
+- Exactly one bullet
+- Maximum 20 words
+- Name pieces and squares but never the move sequence`
 
-Ask 4-6 questions in flowing prose, not a numbered list. Each question should target a different aspect: immediate tactics, candidate moves, opponent's best response, hidden patterns, long-term plan. Use SAN when referencing specific squares or moves. Never give the answer — your goal is to make them notice.`
+export const DEEP_DIVE_SYSTEM = `The student asked for more depth on the previous coaching. Output structured bullets with nesting allowed.
 
-export const TACTICAL_SYSTEM = `You are a chess tactics coach. The 300-800 Elo player is in a position that may contain a tactic. Your job: confirm whether one exists, and if so, guide them to find it without spoiling.
+Format:
+- **Strategic theme:** [one sentence on what the position is about]
+- **Candidate moves:**
+  - [Move 1 in SAN]: [5-10 word reason]
+  - [Move 2 in SAN]: [5-10 word reason]
+  - [Move 3 in SAN]: [5-10 word reason]
+- **Opponent response:** [one sentence on likely reply]
+- **Hidden idea:** [one sentence on what a master notices]
 
-If a tactic exists: name the tactical theme it points toward (fork, pin, skewer, discovered attack, deflection, overloaded defender, back rank, removal of defender, in-between move, zwischenzug, etc.). Then give a single nudging hint that focuses their attention on the right squares or pieces, e.g. 'Look at the relationship between the f7 square and your queen and bishop.' Two sentences max.
+Maximum 4 top-level bullets, 3 sub-bullets under Candidate moves only.`
 
-If no tactic exists: say so briefly and point to one strategic idea worth thinking about. One sentence.
+export const RETROSPECTIVE_SYSTEM = `Reviewing a past move. Output bullets:
+- **You played:** [move] — [classification]
+- **Engine preferred:** [move] — [eval difference]
+- **Why:** [one sentence reason]
+- **Continuation:** [2-3 moves of engine line in SAN with brief outcome]
+- **Lesson:** [one sentence pattern to remember]`
 
-Always use SAN.`
+export type CoachDepth = 'brief' | 'deep_dive' | 'retrospective'
 
-export function systemPromptForStyle(style: CoachingStyle): string {
+export function systemPromptFor(style: CoachingStyle, depth: CoachDepth = 'brief'): string {
+  if (depth === 'deep_dive') return DEEP_DIVE_SYSTEM
+  if (depth === 'retrospective') return RETROSPECTIVE_SYSTEM
   switch (style) {
     case 'socratic': return SOCRATIC_SYSTEM
     case 'tactical': return TACTICAL_SYSTEM
     default:         return CONVERSATIONAL_SYSTEM
   }
+}
+
+// Backward-compat alias
+export function systemPromptForStyle(style: CoachingStyle): string {
+  return systemPromptFor(style, 'brief')
+}
+
+export interface CandidateLine {
+  san: string
+  cp: number
+  /** First 6 plies of principal variation in SAN. */
+  pvSan: string[]
 }
 
 export interface PreMoveContext {
@@ -61,7 +102,7 @@ export interface PreMoveContext {
   color: 'white' | 'black'
   bestMoveSan: string
   bestEvalCp: number
-  candidatesSan: Array<{ san: string; cp: number }> // top 5
+  candidates: CandidateLine[]   // up to 5
   pvSan: string[]            // engine's projected continuation
   materialSummary: string    // e.g. "even" / "+2 for white"
   userElo: number
@@ -80,39 +121,34 @@ export interface PostMoveContext {
 }
 
 export function renderPreMovePrompt(ctx: PreMoveContext): string {
-  return [
+  const lines = [
     `Position: ${ctx.fen}`,
     `Recent moves: ${ctx.recentMovesSan.join(' ')}`,
-    `I'm playing as ${ctx.color}, it's my turn.`,
+    `Playing as ${ctx.color}, my turn.`,
+    `Material: ${ctx.materialSummary}. Elo: ${ctx.userElo}.`,
     ``,
-    `Engine analysis at depth 14:`,
-    `- Best move: ${ctx.bestMoveSan} (eval ${ctx.bestEvalCp}cp)`,
-    `- Top 5 candidates: ${ctx.candidatesSan.map((c) => `${c.san} (${c.cp}cp)`).join(', ')}`,
-    `- Engine's planned continuation: ${ctx.pvSan.join(' ')}`,
-    ``,
-    `Material balance: ${ctx.materialSummary}`,
-    `My Elo: ${ctx.userElo}`,
-    ``,
-    `Coach me through this position using the 5-layer structure. What's happening, what should I be looking at, what might happen, what hidden patterns matter here, and what obscure but useful advice applies?`,
-  ].join('\n')
+    `Top engine candidates:`,
+  ]
+  ctx.candidates.forEach((c, i) => {
+    lines.push(`${i + 1}. ${c.san} (${c.cp}cp) — line: ${c.pvSan.join(' ')}`)
+  })
+  return lines.join('\n')
 }
 
 export function renderPostMovePrompt(ctx: PostMoveContext): string {
   return [
-    `I just played ${ctx.userMoveSan}, which was a ${ctx.classification} (${ctx.centipawnLoss}cp loss).`,
-    `Position before my move: ${ctx.fenBefore}`,
-    `Position after my move: ${ctx.fenAfter}`,
-    `Engine wanted: ${ctx.bestMoveSan} with continuation ${ctx.bestPvSan.join(' ')}`,
-    `Engine sees the response now: ${ctx.engineResponsePvSan.join(' ')}`,
-    `Recent moves: ${ctx.recentMovesSan.join(' ')}`,
-    ``,
-    `Explain what I missed using the 5-layer structure. What was the tactical or strategic point I overlooked? What were better candidate moves and why? What's happening now after my move - can I still recover or is this lost? What's the lesson here for next time?`,
+    `I played ${ctx.userMoveSan} — a ${ctx.classification} (${ctx.centipawnLoss}cp loss).`,
+    `Engine wanted ${ctx.bestMoveSan} with continuation ${ctx.bestPvSan.slice(0, 4).join(' ')}.`,
+    `Position: ${ctx.fenAfter}. Recent: ${ctx.recentMovesSan.slice(-6).join(' ')}.`,
+    `What did I miss?`,
   ].join('\n')
 }
 
 export interface StreamCoachOptions {
   apiKey: string
   style: CoachingStyle
+  /** Coaching depth: brief (default), deep_dive, or retrospective. */
+  depth?: CoachDepth
   /** Either pre- or post-move; exactly one populated. */
   preMove?: PreMoveContext
   postMove?: PostMoveContext
@@ -140,6 +176,11 @@ export async function* streamCoachMessage(
   opts: StreamCoachOptions,
   onUsage: (u: StreamCoachUsage) => void,
 ): AsyncGenerator<string, StreamCoachResult, void> {
+  if (!/^[\x00-\x7F]+$/.test(opts.apiKey)) {
+    throw new Error(
+      'API key contains invalid characters. Re-enter it from console.anthropic.com.',
+    )
+  }
   const client = new Anthropic({
     apiKey: opts.apiKey,
     dangerouslyAllowBrowser: true,
@@ -158,11 +199,15 @@ export async function* streamCoachMessage(
     messages.push({ role: 'user', content: opts.followUp })
   }
 
+  const depth = opts.depth ?? 'brief'
+  const maxTokens = depth === 'deep_dive' ? 500
+                : depth === 'retrospective' ? 400
+                : 180  // brief
   const stream = client.messages.stream(
     {
       model: MODEL_ID,
-      max_tokens: 800,
-      system: systemPromptForStyle(opts.style),
+      max_tokens: maxTokens,
+      system: systemPromptFor(opts.style, depth),
       messages,
     },
     { signal: opts.signal },

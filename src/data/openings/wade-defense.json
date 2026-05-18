@@ -1,0 +1,50 @@
+{
+  "id": "wade-defense",
+  "name": "Wade Defense",
+  "eco": "A41",
+  "popularityRank": 99,
+  "category": "underrated",
+  "side": "black",
+  "startingMoves": [
+    "d4",
+    "d6",
+    "Nf3",
+    "Bg4"
+  ],
+  "description": "Placeholder — run `npm run openings:generate -- --id wade-defense` to populate.",
+  "whyPlayIt": "Placeholder — see description.",
+  "keyIdeas": [
+    "Placeholder idea 1.",
+    "Placeholder idea 2.",
+    "Placeholder idea 3."
+  ],
+  "mainLine": [
+    {
+      "san": "d4",
+      "uci": "d2d4",
+      "fen": "rnbqkbnr/pppppppp/8/8/3P4/8/PPP1PPPP/RNBQKBNR b KQkq - 0 1",
+      "explanation": "Placeholder explanation."
+    },
+    {
+      "san": "d6",
+      "uci": "d7d6",
+      "fen": "rnbqkbnr/ppp1pppp/3p4/8/3P4/8/PPP1PPPP/RNBQKBNR w KQkq - 0 2",
+      "explanation": "Placeholder explanation."
+    },
+    {
+      "san": "Nf3",
+      "uci": "g1f3",
+      "fen": "rnbqkbnr/ppp1pppp/3p4/8/3P4/5N2/PPP1PPPP/RNBQKB1R b KQkq - 1 2",
+      "explanation": "Placeholder explanation."
+    },
+    {
+      "san": "Bg4",
+      "uci": "c8g4",
+      "fen": "rn1qkbnr/ppp1pppp/3p4/8/3P2b1/5N2/PPP1PPPP/RNBQKB1R w KQkq - 2 3",
+      "explanation": "Placeholder explanation."
+    }
+  ],
+  "variations": [],
+  "commonAmateurResponses": [],
+  "trapsToKnow": []
+}

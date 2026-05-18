@@ -2,10 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Chess } from 'chess.js'
 import type { Color, Square } from 'chess.js'
 import { useLocation } from 'react-router-dom'
+import { toast } from 'sonner'
 import { Board } from '@/components/board/Board'
 import { CapturedPieces } from '@/components/board/CapturedPieces'
 import { BoardActionBar } from '@/components/board/BoardActionBar'
 import { CoachPanel } from '@/components/coaching/CoachPanel'
+import { EngineSelector, getDefaultEngine } from '@/components/coaching/EngineSelector'
 import {
   LeftSidebar,
   type CoachMode,
@@ -19,11 +21,18 @@ import { useExplain } from '@/coaching/useExplain'
 import type { BlunderContext } from '@/coaching/llmCoach'
 import { useEngine, parseUciMove } from '@/engine/engine'
 import { useChessGame } from '@/lib/useChessGame'
-import { getWeakeningParams, humanThinkDelay, selectMove } from '@/engine/weakening'
-import { useGameLogger } from '@/games/useGameLogger'
-import { useDeepCoach, type LiveCoachMessage } from '@/coaching/useDeepCoach'
-import type { CoachingStyle, PreMoveContext } from '@/coaching/deepCoach'
+import { humanThinkDelay } from '@/engine/weakening'
+import { useGameLogger, type OpponentMoveMeta } from '@/games/useGameLogger'
+import { getGame, finalizeGame, clearGameCoaching } from '@/games/gameStore'
+import { useDeepCoach, uciPvToSan, uciToSan, type LiveCoachMessage } from '@/coaching/useDeepCoach'
+import type { CandidateLine, CoachingStyle, PreMoveContext } from '@/coaching/deepCoach'
 import { useShortcut } from '@/lib/shortcuts'
+import type { MoveSourceInfo } from '@/components/sidebar/RightSidebar'
+import { requestOpponentMove, type OpponentMode } from '@/engine/opponentEngine'
+import { loadMaiaModel, maiaModelName, selectMaiaModel } from '@/engine/maia'
+import { useAllowPremoves, usePremoveQueue, premoveStillLegal, useArrowsMaster, useArrowsBest, useArrowsThreats } from '@/lib/usePremove'
+import { bestMoveShape, threatShapes } from '@/components/board/BoardArrows'
+import type { DrawShape } from 'chessground/draw'
 
 /** Convert a UCI move to SAN given a FEN. Returns UCI string unchanged on failure. */
 function uciToSanLocal(fen: string, uci: string): string {
@@ -55,9 +64,62 @@ export function PlayPage() {
   const [elo, setElo] = useState(DEFAULT_ELO)
   const [colorChoice, setColorChoice] = useState<UserColor>(DEFAULT_USER_COLOR)
   const [coachMode, setCoachMode] = useState<CoachMode>(DEFAULT_COACH_MODE)
-  const [coachingStyle, setCoachingStyle] = useState<CoachingStyle>('conversational')
+  const [coachingStyle, setCoachingStyle] = useState<CoachingStyle>(() => {
+    try {
+      const v = localStorage.getItem('cc.coachingStyle.v1')
+      if (v === 'conversational' || v === 'socratic' || v === 'tactical') return v
+    } catch { /* ignore */ }
+    return 'conversational'
+  })
+  // Persist the chosen style across sessions.
+  useEffect(() => {
+    try {
+      localStorage.setItem('cc.coachingStyle.v1', coachingStyle)
+    } catch { /* ignore */ }
+  }, [coachingStyle])
+  // Track when the style was just changed so the pre-move effect can skip
+  // re-firing on the current ply (avoids spam when toggling mid-turn).
+  const styleJustChangedRef = useRef(false)
+  const prevStyleRef = useRef(coachingStyle)
+  if (prevStyleRef.current !== coachingStyle) {
+    prevStyleRef.current = coachingStyle
+    styleJustChangedRef.current = true
+  }
   const [debugOpen, setDebugOpen] = useState(false)
   const [engineThinking, setEngineThinking] = useState(false)
+  const [engineMode, setEngineMode] = useState<OpponentMode>(getDefaultEngine())
+
+  // Premove support
+  const [allowPremovesPref, setAllowPremovesPref] = useAllowPremoves()
+  const { queued: queuedPremove, setPremove, cancelPremove } = usePremoveQueue()
+  const [premoveFailSquare, setPremoveFailSquare] = useState<string | null>(null)
+  // Ref so the async engine IIFE always reads the latest queued premove.
+  const queuedPremoveRef = useRef(queuedPremove)
+  queuedPremoveRef.current = queuedPremove
+  // Effective allowPremoves: disabled in full coach mode to avoid coaching conflicts.
+  const allowPremoves = allowPremovesPref && coachMode !== 'full'
+  // When coachMode transitions to 'full', clear any queued premove.
+  const prevCoachModeRef = useRef(coachMode)
+  if (prevCoachModeRef.current !== coachMode) {
+    prevCoachModeRef.current = coachMode
+    if (coachMode === 'full') {
+      cancelPremove()
+    }
+  }
+
+  // Arrow toggle settings (persisted to localStorage)
+  const [arrowsMaster, setArrowsMaster] = useArrowsMaster()
+  const [arrowsBest, setArrowsBest] = useArrowsBest()
+  const [arrowsThreats, setArrowsThreats] = useArrowsThreats()
+
+  // Lazy-load Maia model when the user picks Maia or changes Elo bucket.
+  useEffect(() => {
+    if (engineMode !== 'maia') return
+    const tid = toast.loading('Loading Maia neural network…')
+    loadMaiaModel(elo)
+      .then(() => toast.success(`Maia ${selectMaiaModel(elo)} ready`, { id: tid }))
+      .catch((e) => toast.error(`Maia load failed: ${String(e)}`, { id: tid }))
+  }, [engineMode, elo])
 
   const userColor: Color = game.orientation === 'white' ? 'w' : 'b'
 
@@ -158,15 +220,27 @@ export function PlayPage() {
     enabled: blunderAlert !== null && coachMode === 'full',
   })
 
+  // Provenance metadata for the next opponent move. PlayPage sets this before
+  // calling makeMove; useGameLogger reads and clears it as it persists the move.
+  const lastOpponentMetaRef = useRef<OpponentMoveMeta | null>(null)
+
+  // Per-ply (0-based index into game.history) source map for the move list badge.
+  const [moveSources, setMoveSources] = useState<ReadonlyMap<number, MoveSourceInfo>>(
+    () => new Map(),
+  )
+
   // Log every move to persistent game storage with background analysis
-  const { appendCoachMessage } = useGameLogger({
+  const { appendCoachMessage, currentGameId } = useGameLogger({
     game,
     engineElo: elo,
     userColor: userColor === 'w' ? 'white' : 'black',
     coachMode,
+    engine: engineMode,
+    engineModel: engineMode === 'maia' ? maiaModelName(elo) : 'stockfish-18',
     coachMessage: coach.blunderAlert
       ? { ply: game.history.length, text: `Blunder: ${coach.blunderAlert.san} lost ${coach.blunderAlert.loss}cp. Engine prefers ${coach.blunderAlert.better}.` }
       : null,
+    lastOpponentMetaRef,
   })
 
   // Refs for the current pre/post move context so Tell Me More can reference them
@@ -195,6 +269,12 @@ export function PlayPage() {
     if (game.turn !== userColor) return
     if (coachMode !== 'full' || !hasKey) return
     if (!coach.liveEval) return
+    // If this effect ran solely because the user switched coaching style
+    // mid-ply, skip the re-fire to avoid spamming the same position.
+    if (styleJustChangedRef.current) {
+      styleJustChangedRef.current = false
+      return
+    }
 
     // Build PreMoveContext from available engine data
     const liveEval = coach.liveEval
@@ -213,13 +293,19 @@ export function PlayPage() {
       }
     } catch { /* ignore */ }
 
+    const candidates: CandidateLine[] = (liveEval.candidates ?? []).slice(0, 5).map((c) => ({
+      san: uciToSan(game.fen, c.move),
+      cp: c.cp,
+      pvSan: uciPvToSan(game.fen, c.pv, 6),
+    }))
+
     const ctx: PreMoveContext = {
       fen: game.fen,
       recentMovesSan,
       color: userColor === 'w' ? 'white' : 'black',
       bestMoveSan,
       bestEvalCp: liveEval.cp,
-      candidatesSan: [{ san: bestMoveSan, cp: liveEval.cp }],
+      candidates: candidates.length > 0 ? candidates : [{ san: bestMoveSan, cp: liveEval.cp, pvSan }],
       pvSan,
       materialSummary: 'even',
       userElo: elo,
@@ -263,36 +349,29 @@ export function PlayPage() {
     if (game.turn !== engineColor) return
 
     const requestId = ++engineRequestIdRef.current
-    const params = getWeakeningParams(elo)
     const evalCp = coach.liveEval?.cp
     const fenBefore = game.fen
+    // The ply about to be played (history length grows by 1 after makeMove).
+    const ply = game.history.length + 1
 
     setEngineThinking(true)
     void (async () => {
       try {
         const startedAt = performance.now()
-        const move = await engine.requestMove({
+
+        // Unified opponent move pipeline: book → maia (with Stockfish fallback) → Stockfish.
+        const result = await requestOpponentMove({
+          engine,
           fen: fenBefore,
-          depth: params.depth,
-          movetime: params.movetime,
-          multipv: params.multipv,
+          ply,
+          elo,
+          mode: engineMode,
+          liveEvalCp: evalCp,
         })
         if (engineRequestIdRef.current !== requestId) return
 
-        const fallbackUci = `${move.from}${move.to}${move.promotion ?? ''}`
-        const candidates =
-          move.topCandidates && move.topCandidates.length > 0
-            ? move.topCandidates
-            : [{ move: fallbackUci, cp: 0, pv: [] }]
-
-        const result = selectMove({
-          candidates,
-          randomMoveChance: params.randomMoveChance,
-          blunderChance: params.blunderChance,
-          fenBefore,
-          eloForSanity: elo,
-          evalCp,
-        })
+        const chosenUci = result.uci
+        if (!chosenUci) return
 
         // Wait for human-feel think time, measured from request start.
         const elapsed = performance.now() - startedAt
@@ -300,17 +379,69 @@ export function PlayPage() {
         if (wait > 0) await new Promise((r) => setTimeout(r, wait))
         if (engineRequestIdRef.current !== requestId) return
 
-        const chosen = parseUciMove(result.uci)
+        // Record provenance for the debug overlay and the logger.
+        // result.source is always 'book' | 'stockfish' | 'maia' for opponent
+        // moves (never 'user'), but the type union includes 'user'; narrow it.
+        if (result.source !== 'user') {
+          engine.recordOpponentSource(result.source)
+        }
+        lastOpponentMetaRef.current = {
+          source: result.source,
+          engineModel: result.engineModel,
+          ...(result.bookWeight !== undefined ? { bookWeight: result.bookWeight } : {}),
+        }
+        // Snapshot for the move-list badge (history index is ply - 1).
+        const historyIndex = ply - 1
+        setMoveSources((prev) => {
+          const next = new Map(prev)
+          next.set(historyIndex, {
+            source: result.source,
+            ...(result.bookWeight !== undefined ? { bookWeight: result.bookWeight } : {}),
+          })
+          return next
+        })
+
+        const chosen = parseUciMove(chosenUci)
         game.makeMove({
           from: chosen.from as Square,
           to: chosen.to as Square,
           promotion: chosen.promotion,
         })
 
+        // After the engine move lands, try to execute any queued premove.
+        const currentPremove = queuedPremoveRef.current
+        if (currentPremove) {
+          const newFen = game.fen
+          const legal = premoveStillLegal(newFen, currentPremove)
+          if (legal) {
+            // Brief visual breathing room before executing.
+            setTimeout(() => {
+              game.makeMove({
+                from: legal.from as Square,
+                to: legal.to as Square,
+                promotion: 'q',
+              })
+              cancelPremove()
+            }, 100)
+          } else {
+            // Flash the origin square red to signal the premove was illegal.
+            setPremoveFailSquare(currentPremove.from)
+            setTimeout(() => setPremoveFailSquare(null), 200)
+            cancelPremove()
+          }
+        }
+
         const lastEntry = game.history[game.history.length - 1]
-        if (lastEntry && engine) {
-          engine.recordEngineMoveSan(result.uci, lastEntry.san)
-          engine.recordRoll(result.uci, result.roll, result.cpBest)
+        if (lastEntry && engine && result.source === 'stockfish') {
+          engine.recordEngineMoveSan(chosenUci, lastEntry.san)
+          if (result.rollMeta) {
+            const cpBest = result.rollMeta.cpBest ?? 0
+            engine.recordRoll(
+              chosenUci,
+              result.rollMeta.roll as 'best' | 'random' | 'blunder' | 'filtered',
+              cpBest,
+            )
+          }
         }
       } catch {
         // Engine disposed mid-request, or transport error. Silent fail —
@@ -323,7 +454,7 @@ export function PlayPage() {
     // including it would loop. The fields we read (fen/turn/isGameOver) are
     // in deps; makeMove is stable in behavior even though its identity isn't.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [engine, ready, game.fen, game.turn, game.isGameOver, userColor, elo])
+  }, [engine, ready, game.fen, game.turn, game.isGameOver, userColor, elo, engineMode])
 
   const handleUserMove = (
     from: string,
@@ -341,22 +472,49 @@ export function PlayPage() {
     engineRequestIdRef.current++ // invalidate any in-flight engine move
     coach.dismissAlert()
     deepCoach.cancel()
+    lastOpponentMetaRef.current = null
+    setMoveSources(new Map())
+
+    // Abandonment: if the previous game exists and is still ongoing, finalize
+    // it as a draw and (unless opted in) clear its coaching before the reset.
+    if (currentGameId) {
+      const prev = getGame(currentGameId)
+      if (prev && prev.result === 'ongoing') {
+        finalizeGame(currentGameId, '1/2-1/2', game.pgn ?? '')
+        const keepCoaching = ((): boolean => {
+          try { return localStorage.getItem('cc.keepCoaching.v1') === '1' } catch { return false }
+        })()
+        if (!keepCoaching) clearGameCoaching(currentGameId)
+        toast('Previous game saved as abandoned')
+      }
+    }
+
     const next = resolveUserColor(colorChoice)
     game.setOrientation(next)
     game.reset()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [colorChoice, coach.dismissAlert, deepCoach.cancel])
+  }, [colorChoice, coach.dismissAlert, deepCoach.cancel, currentGameId])
 
   const handleTakeBack = useCallback((): void => {
     if (game.history.length === 0) return
     engineRequestIdRef.current++ // invalidate any in-flight engine move
     coach.dismissAlert()
     deepCoach.cancel()
+    lastOpponentMetaRef.current = null
     // If it's currently the user's turn, the last ply was the engine's reply
     // to the user's blunder; undo both. If it's the engine's turn, only the
     // user's most recent move has been played; undo just that.
     const pliesToUndo = game.turn === userColor ? 2 : 1
-    game.undo(Math.min(pliesToUndo, game.history.length))
+    const undone = Math.min(pliesToUndo, game.history.length)
+    const newLen = game.history.length - undone
+    setMoveSources((prev) => {
+      const next = new Map<number, MoveSourceInfo>()
+      for (const [k, v] of prev) {
+        if (k < newLen) next.set(k, v)
+      }
+      return next
+    })
+    game.undo(undone)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game.history.length, game.turn, userColor, coach.dismissAlert, deepCoach.cancel])
 
@@ -403,6 +561,31 @@ export function PlayPage() {
 
   const activePly = game.history.length - 1
 
+  // Compute board arrow shapes from current eval + settings.
+  const enoughMoves = game.history.length >= 4
+  const userTurn = game.turn === userColor
+  const liveEval = coach.liveEval
+  const userColorStr = userColor === 'w' ? 'white' : 'black'
+
+  const bestArrow: DrawShape | null =
+    arrowsMaster && arrowsBest && enoughMoves && userTurn && liveEval?.candidates?.[0]
+      ? bestMoveShape(liveEval.candidates[0])
+      : null
+
+  const threatArrows: DrawShape[] =
+    arrowsMaster && arrowsThreats && enoughMoves && userColor
+      ? threatShapes(game.fen, userColorStr)
+      : []
+
+  const shapes: DrawShape[] = [bestArrow, ...threatArrows].filter(
+    (s): s is DrawShape => Boolean(s),
+  )
+
+  const coachFlags = {
+    hasBestArrow: Boolean(bestArrow),
+    hasThreatArrow: threatArrows.length > 0,
+  }
+
   return (
     <div className="mx-auto grid w-full max-w-[1280px] grid-cols-1 gap-6 px-6 py-8 md:grid-cols-[280px_1fr_320px]">
       <aside className="space-y-4 md:sticky md:top-20 md:self-start">
@@ -419,7 +602,18 @@ export function PlayPage() {
           engineStatus={ready ? 'ready' : 'loading'}
           coachingStyle={coachingStyle}
           onCoachingStyleChange={setCoachingStyle}
+          allowPremoves={allowPremovesPref}
+          onAllowPremovesChange={setAllowPremovesPref}
+          arrowsMaster={arrowsMaster}
+          onArrowsMasterChange={setArrowsMaster}
+          arrowsBest={arrowsBest}
+          onArrowsBestChange={setArrowsBest}
+          arrowsThreats={arrowsThreats}
+          onArrowsThreatsChange={setArrowsThreats}
         />
+        <div className="rounded-lg border bg-card p-4">
+          <EngineSelector value={engineMode} onChange={setEngineMode} disabled={false} />
+        </div>
       </aside>
 
       <main className="flex flex-col items-center gap-4">
@@ -438,6 +632,11 @@ export function PlayPage() {
             lastMove={game.lastMove}
             inCheck={game.inCheck}
             onUserMove={handleUserMove}
+            allowPremoves={allowPremoves}
+            onPremoveSet={(orig, dest) => setPremove({ from: orig, to: dest })}
+            onPremoveUnset={cancelPremove}
+            premoveFailSquare={premoveFailSquare}
+            shapes={shapes}
           />
         </div>
         <BoardActionBar
@@ -461,6 +660,7 @@ export function PlayPage() {
           messages={deepCoach.messages}
           onTellMore={handleTellMore}
           onQuieter={handleQuieter}
+          coachFlags={coachFlags}
         />
       </main>
 
@@ -470,6 +670,7 @@ export function PlayPage() {
           evalCpWhitePov={evalCpWhitePov}
           mateIn={mateInWhitePov}
           activePly={activePly >= 0 ? activePly : null}
+          moveSources={moveSources}
         />
       </aside>
 

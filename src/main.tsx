@@ -3,15 +3,18 @@ import { createRoot } from 'react-dom/client'
 import { RouterProvider } from 'react-router-dom'
 import { ApiKeyProvider } from '@/coaching/apiKey'
 import { CostCounterProvider } from '@/coaching/costCounter'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import { router } from './router'
 import './index.css'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <ApiKeyProvider>
-      <CostCounterProvider>
-        <RouterProvider router={router} />
-      </CostCounterProvider>
-    </ApiKeyProvider>
+    <ErrorBoundary>
+      <ApiKeyProvider>
+        <CostCounterProvider>
+          <RouterProvider router={router} />
+        </CostCounterProvider>
+      </ApiKeyProvider>
+    </ErrorBoundary>
   </StrictMode>,
 )

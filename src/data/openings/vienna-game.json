@@ -1,0 +1,43 @@
+{
+  "id": "vienna-game",
+  "name": "Vienna Game",
+  "eco": "C25",
+  "popularityRank": 99,
+  "category": "main_lines",
+  "side": "white",
+  "startingMoves": [
+    "e4",
+    "e5",
+    "Nc3"
+  ],
+  "description": "Placeholder — run `npm run openings:generate -- --id vienna-game` to populate.",
+  "whyPlayIt": "Placeholder — see description.",
+  "keyIdeas": [
+    "Placeholder idea 1.",
+    "Placeholder idea 2.",
+    "Placeholder idea 3."
+  ],
+  "mainLine": [
+    {
+      "san": "e4",
+      "uci": "e2e4",
+      "fen": "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1",
+      "explanation": "Placeholder explanation."
+    },
+    {
+      "san": "e5",
+      "uci": "e7e5",
+      "fen": "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2",
+      "explanation": "Placeholder explanation."
+    },
+    {
+      "san": "Nc3",
+      "uci": "b1c3",
+      "fen": "rnbqkbnr/pppp1ppp/8/4p3/4P3/2N5/PPPP1PPP/R1BQKBNR b KQkq - 1 2",
+      "explanation": "Placeholder explanation."
+    }
+  ],
+  "variations": [],
+  "commonAmateurResponses": [],
+  "trapsToKnow": []
+}

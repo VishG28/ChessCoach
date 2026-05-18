@@ -1,211 +1,91 @@
 {
   "id": "caro-kann",
-  "title": "Caro-Kann Defense",
-  "userColor": "black",
-  "startFen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+  "name": "Caro-Kann Defense",
+  "eco": "B10",
+  "popularityRank": 15,
+  "category": "main_lines",
+  "side": "black",
+  "startingMoves": ["e4", "c6"],
   "description": "The Caro-Kann is a solid defense for Black against 1.e4. You play 1...c6 preparing to push d5, which challenges White's center without blocking your light-squared bishop. It's an excellent choice for beginners who want safe, principled play.",
-  "root": {
-    "id": "caro-kann:root",
-    "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
-    "san": "",
-    "uci": "",
-    "explanation": "Starting position. White will play e4 and we respond with the Caro-Kann.",
-    "children": [
-      {
-        "id": "caro-kann:1e4",
-        "fen": "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1",
-        "san": "e4",
-        "uci": "e2e4",
-        "explanation": "White plays e4, the most popular first move. Now we respond with the Caro-Kann: 1...c6.",
-        "children": [
-          {
-            "id": "caro-kann:1e4-c6",
-            "fen": "rnbqkbnr/pp1ppppp/2p5/8/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2",
-            "san": "c6",
-            "uci": "c7c6",
-            "explanation": "The Caro-Kann move! We prepare d5 to challenge White's center. Unlike the French Defense (1...e6), this doesn't block our light-squared bishop.",
-            "children": [
-              {
-                "id": "caro-kann:1e4-c6-2d4",
-                "fen": "rnbqkbnr/pp1ppppp/2p5/8/3PP3/8/PPP2PPP/RNBQKBNR b KQkq - 0 2",
-                "san": "d4",
-                "uci": "d2d4",
-                "explanation": "White builds a strong pawn center with d4. This is the most ambitious response.",
-                "children": [
-                  {
-                    "id": "caro-kann:1e4-c6-2d4-d5",
-                    "fen": "rnbqkbnr/pp2pppp/2p5/3p4/3PP3/8/PPP2PPP/RNBQKBNR w KQkq - 0 3",
-                    "san": "d5",
-                    "uci": "d7d5",
-                    "explanation": "Now we challenge the center with d5! This is what c6 was preparing. We have a solid pawn on d5 backed by c6.",
-                    "children": [
-                      {
-                        "id": "caro-kann:1e4-c6-2d4-d5-3Nc3",
-                        "fen": "rnbqkbnr/pp2pppp/2p5/3p4/3PP3/2N5/PPP2PPP/R1BQKBNR b KQkq - 1 3",
-                        "san": "Nc3",
-                        "uci": "b1c3",
-                        "explanation": "White defends e4 with the knight. This leads to the Classical Caro-Kann — one of the sharpest lines.",
-                        "children": [
-                          {
-                            "id": "caro-kann:1e4-c6-2d4-d5-3Nc3-dxe4",
-                            "fen": "rnbqkbnr/pp2pppp/2p5/8/3Pp3/2N5/PPP2PPP/R1BQKBNR w KQkq - 0 4",
-                            "san": "dxe4",
-                            "uci": "d5e4",
-                            "explanation": "We capture on e4! This exchange releases the tension and starts the Classical variation. Now White must recapture.",
-                            "children": [
-                              {
-                                "id": "caro-kann:1e4-c6-2d4-d5-3Nc3-dxe4-4Nxe4",
-                                "fen": "rnbqkbnr/pp2pppp/2p5/8/3PN3/8/PPP2PPP/R1BQKBNR b KQkq - 0 4",
-                                "san": "Nxe4",
-                                "uci": "c3e4",
-                                "explanation": "White recaptures with the knight, centralizing it powerfully. Now we play 4...Bf5, the most important move!",
-                                "children": [
-                                  {
-                                    "id": "caro-kann:1e4-c6-2d4-d5-3Nc3-dxe4-4Nxe4-Bf5",
-                                    "fen": "rn1qkbnr/pp2pppp/2p5/5b2/3PN3/8/PPP2PPP/R1BQKBNR w KQkq - 1 5",
-                                    "san": "Bf5",
-                                    "uci": "c8f5",
-                                    "explanation": "Bf5 is the key move! We develop our light-squared bishop BEFORE playing e6, which would lock it in. This is the big advantage of the Caro-Kann over the French.",
-                                    "children": [
-                                      {
-                                        "id": "caro-kann:1e4-c6-2d4-d5-3Nc3-dxe4-4Nxe4-Bf5-5Ng3",
-                                        "fen": "rn1qkbnr/pp2pppp/2p5/5b2/3P4/6N1/PPP2PPP/R1BQKBNR b KQkq - 2 5",
-                                        "san": "Ng3",
-                                        "uci": "e4g3",
-                                        "explanation": "White attacks our bishop with Ng3. Don't retreat to e6 — that blocks your pawn! Play Bg6 instead.",
-                                        "children": [
-                                          {
-                                            "id": "caro-kann:1e4-c6-2d4-d5-3Nc3-dxe4-4Nxe4-Bf5-5Ng3-Bg6",
-                                            "fen": "rn1qkbnr/pp2pppp/2p3b1/8/3P4/6N1/PPP2PPP/R1BQKBNR w KQkq - 3 6",
-                                            "san": "Bg6",
-                                            "uci": "f5g6",
-                                            "explanation": "Bg6 retreats the bishop to a safe square where it still has long-term influence. We have a very solid position! Classical Caro-Kann line complete.",
-                                            "children": []
-                                          }
-                                        ]
-                                      }
-                                    ]
-                                  }
-                                ]
-                              }
-                            ]
-                          }
-                        ]
-                      },
-                      {
-                        "id": "caro-kann:1e4-c6-2d4-d5-3e5",
-                        "fen": "rnbqkbnr/pp2pppp/2p5/3pP3/3P4/8/PPP2PPP/RNBQKBNR b KQkq - 0 3",
-                        "san": "e5",
-                        "uci": "e4e5",
-                        "explanation": "White plays e5, the Advance Variation — grabbing more space. Don't panic! We have a clear plan: develop the bishop outside the chain with Bf5.",
-                        "children": [
-                          {
-                            "id": "caro-kann:1e4-c6-2d4-d5-3e5-Bf5",
-                            "fen": "rn1qkbnr/pp2pppp/2p5/3pPb2/3P4/8/PPP2PPP/RNBQKBNR w KQkq - 1 4",
-                            "san": "Bf5",
-                            "uci": "c8f5",
-                            "explanation": "Bf5! Get the bishop out before playing e6. This is the same idea as the Classical — develop your bishops before closing the pawn chain.",
-                            "children": [
-                              {
-                                "id": "caro-kann:1e4-c6-2d4-d5-3e5-Bf5-4Nf3",
-                                "fen": "rn1qkbnr/pp2pppp/2p5/3pPb2/3P4/5N2/PPP2PPP/RNBQKB1R b KQkq - 2 4",
-                                "san": "Nf3",
-                                "uci": "g1f3",
-                                "explanation": "White develops the knight. Now we play e6, closing the pawn chain — but our bishop is already safely developed!",
-                                "children": [
-                                  {
-                                    "id": "caro-kann:1e4-c6-2d4-d5-3e5-Bf5-4Nf3-e6",
-                                    "fen": "rn1qkbnr/pp3ppp/2p1p3/3pPb2/3P4/5N2/PPP2PPP/RNBQKB1R w KQkq - 0 5",
-                                    "san": "e6",
-                                    "uci": "e7e6",
-                                    "explanation": "e6 solidifies our pawn structure. The bishop is already on f5, safe and active — unlike the French where it gets locked in.",
-                                    "children": [
-                                      {
-                                        "id": "caro-kann:1e4-c6-2d4-d5-3e5-Bf5-4Nf3-e6-5Be2",
-                                        "fen": "rn1qkbnr/pp3ppp/2p1p3/3pPb2/3P4/5N2/PPP1BPPP/RNBQK2R b KQkq - 1 5",
-                                        "san": "Be2",
-                                        "uci": "f1e2",
-                                        "explanation": "White develops the bishop. Now we play Nd7, preparing to challenge the e5 pawn.",
-                                        "children": [
-                                          {
-                                            "id": "caro-kann:1e4-c6-2d4-d5-3e5-Bf5-4Nf3-e6-5Be2-Nd7",
-                                            "fen": "r2qkbnr/pp1n1ppp/2p1p3/3pPb2/3P4/5N2/PPP1BPPP/RNBQK2R w KQkq - 2 6",
-                                            "san": "Nd7",
-                                            "uci": "b8d7",
-                                            "explanation": "Nd7 develops a piece and prepares ...Ne7 to challenge the e5 pawn later. We have a very solid setup. Advance Variation line complete!",
-                                            "children": []
-                                          }
-                                        ]
-                                      }
-                                    ]
-                                  }
-                                ]
-                              }
-                            ]
-                          }
-                        ]
-                      },
-                      {
-                        "id": "caro-kann:1e4-c6-2d4-d5-3exd5",
-                        "fen": "rnbqkbnr/pp2pppp/2p5/3P4/3P4/8/PPP2PPP/RNBQKBNR b KQkq - 0 3",
-                        "san": "exd5",
-                        "uci": "e4d5",
-                        "explanation": "White plays exd5, the Exchange Variation — trading pawns to simplify. We recapture with cxd5.",
-                        "children": [
-                          {
-                            "id": "caro-kann:1e4-c6-2d4-d5-3exd5-cxd5",
-                            "fen": "rnbqkbnr/pp2pppp/8/3p4/3P4/8/PPP2PPP/RNBQKBNR w KQkq - 0 4",
-                            "san": "cxd5",
-                            "uci": "c6d5",
-                            "explanation": "cxd5 recaptures, giving us a strong central pawn on d5. The Exchange Variation leads to very equal positions — good for beginners who want simplicity.",
-                            "children": [
-                              {
-                                "id": "caro-kann:1e4-c6-2d4-d5-3exd5-cxd5-4Bd3",
-                                "fen": "rnbqkbnr/pp2pppp/8/3p4/3P4/3B4/PPP2PPP/RNBQK1NR b KQkq - 1 4",
-                                "san": "Bd3",
-                                "uci": "f1d3",
-                                "explanation": "White develops the bishop to d3, eyeing our kingside. We develop our pieces naturally.",
-                                "children": [
-                                  {
-                                    "id": "caro-kann:1e4-c6-2d4-d5-3exd5-cxd5-4Bd3-Nc6",
-                                    "fen": "r1bqkbnr/pp2pppp/2n5/3p4/3P4/3B4/PPP2PPP/RNBQK1NR w KQkq - 2 5",
-                                    "san": "Nc6",
-                                    "uci": "b8c6",
-                                    "explanation": "Nc6 develops with tempo, putting pressure on d4. We're building a solid position with active pieces.",
-                                    "children": [
-                                      {
-                                        "id": "caro-kann:1e4-c6-2d4-d5-3exd5-cxd5-4Bd3-Nc6-5c3",
-                                        "fen": "r1bqkbnr/pp2pppp/2n5/3p4/3P4/2PB4/PP3PPP/RNBQK1NR b KQkq - 0 5",
-                                        "san": "c3",
-                                        "uci": "c2c3",
-                                        "explanation": "White supports d4 with c3. Now we play Nf6, completing development.",
-                                        "children": [
-                                          {
-                                            "id": "caro-kann:1e4-c6-2d4-d5-3exd5-cxd5-4Bd3-Nc6-5c3-Nf6",
-                                            "fen": "r1bqkb1r/pp2pppp/2n2n2/3p4/3P4/2PB4/PP3PPP/RNBQK1NR w KQkq - 1 6",
-                                            "san": "Nf6",
-                                            "uci": "g8f6",
-                                            "explanation": "Nf6 develops the knight to its ideal square. We have two active knights and a solid pawn on d5. Exchange Variation line complete!",
-                                            "children": []
-                                          }
-                                        ]
-                                      }
-                                    ]
-                                  }
-                                ]
-                              }
-                            ]
-                          }
-                        ]
-                      }
-                    ]
-                  }
-                ]
-              }
-            ]
-          }
-        ]
-      }
-    ]
-  }
+  "whyPlayIt": "The Caro-Kann gives Black a solid pawn structure and active piece play without needing to memorize deep theory. Unlike the French Defense, your light-squared bishop stays free — one of Black's biggest advantages.",
+  "keyIdeas": [
+    "Play c6 first to prepare d5 — this challenges White's center while keeping the light-squared bishop unblocked.",
+    "After dxe4, develop the bishop to f5 BEFORE playing e6, which would lock it in — this is the defining advantage over the French Defense.",
+    "Aim for a solid, slightly passive but unbreakable position, then gradually improve your pieces while White struggles to break through."
+  ],
+  "mainLine": [
+    { "san": "e4", "uci": "e2e4", "fen": "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1", "explanation": "White plays e4, the most popular first move. Now we respond with the Caro-Kann: 1...c6." },
+    { "san": "c6", "uci": "c7c6", "fen": "rnbqkbnr/pp1ppppp/2p5/8/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2", "explanation": "The Caro-Kann move! We prepare d5 to challenge White's center. Unlike the French Defense (1...e6), this doesn't block our light-squared bishop." },
+    { "san": "d4", "uci": "d2d4", "fen": "rnbqkbnr/pp1ppppp/2p5/8/3PP3/8/PPP2PPP/RNBQKBNR b KQkq - 0 2", "explanation": "White builds a strong pawn center with d4. This is the most ambitious response." },
+    { "san": "d5", "uci": "d7d5", "fen": "rnbqkbnr/pp2pppp/2p5/3p4/3PP3/8/PPP2PPP/RNBQKBNR w KQkq - 0 3", "explanation": "Now we challenge the center with d5! This is what c6 was preparing. We have a solid pawn on d5 backed by c6." },
+    { "san": "Nc3", "uci": "b1c3", "fen": "rnbqkbnr/pp2pppp/2p5/3p4/3PP3/2N5/PPP2PPP/R1BQKBNR b KQkq - 1 3", "explanation": "White defends e4 with the knight. This leads to the Classical Caro-Kann — one of the sharpest lines." },
+    { "san": "dxe4", "uci": "d5e4", "fen": "rnbqkbnr/pp2pppp/2p5/8/3Pp3/2N5/PPP2PPP/R1BQKBNR w KQkq - 0 4", "explanation": "We capture on e4! This exchange releases the tension and starts the Classical variation. Now White must recapture." },
+    { "san": "Nxe4", "uci": "c3e4", "fen": "rnbqkbnr/pp2pppp/2p5/8/3PN3/8/PPP2PPP/R1BQKBNR b KQkq - 0 4", "explanation": "White recaptures with the knight, centralizing it powerfully. Now we play 4...Bf5, the most important move!" },
+    { "san": "Bf5", "uci": "c8f5", "fen": "rn1qkbnr/pp2pppp/2p5/5b2/3PN3/8/PPP2PPP/R1BQKBNR w KQkq - 1 5", "explanation": "Bf5 is the key move! We develop our light-squared bishop BEFORE playing e6, which would lock it in. This is the big advantage of the Caro-Kann over the French." },
+    { "san": "Ng3", "uci": "e4g3", "fen": "rn1qkbnr/pp2pppp/2p5/5b2/3P4/6N1/PPP2PPP/R1BQKBNR b KQkq - 2 5", "explanation": "White attacks our bishop with Ng3. Don't retreat to e6 — that blocks your pawn! Play Bg6 instead." },
+    { "san": "Bg6", "uci": "f5g6", "fen": "rn1qkbnr/pp2pppp/2p3b1/8/3P4/6N1/PPP2PPP/R1BQKBNR w KQkq - 3 6", "explanation": "Bg6 retreats the bishop to a safe square where it still has long-term influence. We have a very solid position! Classical Caro-Kann line complete." }
+  ],
+  "variations": [
+    {
+      "id": "advance-variation",
+      "name": "Advance Variation",
+      "triggerMove": "Nc3",
+      "moves": [
+        { "san": "e5", "uci": "e4e5", "fen": "rnbqkbnr/pp2pppp/2p5/3pP3/3P4/8/PPP2PPP/RNBQKBNR b KQkq - 0 3", "explanation": "White plays e5, the Advance Variation — grabbing more space. Don't panic! We have a clear plan: develop the bishop outside the chain with Bf5." },
+        { "san": "Bf5", "uci": "c8f5", "fen": "rn1qkbnr/pp2pppp/2p5/3pPb2/3P4/8/PPP2PPP/RNBQKBNR w KQkq - 1 4", "explanation": "Bf5! Get the bishop out before playing e6. This is the same idea as the Classical — develop your bishops before closing the pawn chain." },
+        { "san": "Nf3", "uci": "g1f3", "fen": "rn1qkbnr/pp2pppp/2p5/3pPb2/3P4/5N2/PPP2PPP/RNBQKB1R b KQkq - 2 4", "explanation": "White develops the knight. Now we play e6, closing the pawn chain — but our bishop is already safely developed!" },
+        { "san": "e6", "uci": "e7e6", "fen": "rn1qkbnr/pp3ppp/2p1p3/3pPb2/3P4/5N2/PPP2PPP/RNBQKB1R w KQkq - 0 5", "explanation": "e6 solidifies our pawn structure. The bishop is already on f5, safe and active — unlike the French where it gets locked in." },
+        { "san": "Be2", "uci": "f1e2", "fen": "rn1qkbnr/pp3ppp/2p1p3/3pPb2/3P4/5N2/PPP1BPPP/RNBQK2R b KQkq - 1 5", "explanation": "White develops the bishop. Now we play Nd7, preparing to challenge the e5 pawn." },
+        { "san": "Nd7", "uci": "b8d7", "fen": "r2qkbnr/pp1n1ppp/2p1p3/3pPb2/3P4/5N2/PPP1BPPP/RNBQK2R w KQkq - 2 6", "explanation": "Nd7 develops a piece and prepares ...Ne7 to challenge the e5 pawn later. We have a very solid setup. Advance Variation line complete!" }
+      ],
+      "explanation": "The Advance Variation (3.e5) gives White more space but we get easy piece play with Bf5 and e6."
+    },
+    {
+      "id": "exchange-variation",
+      "name": "Exchange Variation",
+      "triggerMove": "Nc3",
+      "moves": [
+        { "san": "exd5", "uci": "e4d5", "fen": "rnbqkbnr/pp2pppp/2p5/3P4/3P4/8/PPP2PPP/RNBQKBNR b KQkq - 0 3", "explanation": "White plays exd5, the Exchange Variation — trading pawns to simplify. We recapture with cxd5." },
+        { "san": "cxd5", "uci": "c6d5", "fen": "rnbqkbnr/pp2pppp/8/3p4/3P4/8/PPP2PPP/RNBQKBNR w KQkq - 0 4", "explanation": "cxd5 recaptures, giving us a strong central pawn on d5. The Exchange Variation leads to very equal positions — good for beginners who want simplicity." },
+        { "san": "Bd3", "uci": "f1d3", "fen": "rnbqkbnr/pp2pppp/8/3p4/3P4/3B4/PPP2PPP/RNBQK1NR b KQkq - 1 4", "explanation": "White develops the bishop to d3, eyeing our kingside. We develop our pieces naturally." },
+        { "san": "Nc6", "uci": "b8c6", "fen": "r1bqkbnr/pp2pppp/2n5/3p4/3P4/3B4/PPP2PPP/RNBQK1NR w KQkq - 2 5", "explanation": "Nc6 develops with tempo, putting pressure on d4. We're building a solid position with active pieces." },
+        { "san": "c3", "uci": "c2c3", "fen": "r1bqkbnr/pp2pppp/2n5/3p4/3P4/2PB4/PP3PPP/RNBQK1NR b KQkq - 0 5", "explanation": "White supports d4 with c3. Now we play Nf6, completing development." },
+        { "san": "Nf6", "uci": "g8f6", "fen": "r1bqkb1r/pp2pppp/2n2n2/3p4/3P4/2PB4/PP3PPP/RNBQK1NR w KQkq - 1 6", "explanation": "Nf6 develops the knight to its ideal square. We have two active knights and a solid pawn on d5. Exchange Variation line complete!" }
+      ],
+      "explanation": "The Exchange Variation creates symmetrical, simplified positions — a good choice if you want quiet, technical play."
+    }
+  ],
+  "commonAmateurResponses": [
+    {
+      "name": "2.Bc4 before building center",
+      "description": "Some beginners play 2.Bc4 immediately, hoping to attack f7, but this doesn't work against the Caro-Kann setup.",
+      "moves": [
+        { "san": "e4", "uci": "e2e4", "fen": "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1", "explanation": "White plays e4." },
+        { "san": "c6", "uci": "c7c6", "fen": "rnbqkbnr/pp1ppppp/2p5/8/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2", "explanation": "We play c6." },
+        { "san": "Bc4", "uci": "f1c4", "fen": "rnbqkbnr/pp1ppppp/2p5/8/2B1P3/8/PPPP1PPP/RNBQK1NR b KQkq - 1 2", "explanation": "White tries Bc4, eyeing f7." }
+      ],
+      "refutation": "Play d5 immediately — e.g. 2...d5 3.exd5 cxd5 and the bishop on c4 is misplaced. You get a great version of the Caro-Kann Exchange."
+    },
+    {
+      "name": "2.Nc3 without d4",
+      "description": "Playing Nc3 without first securing d4 gives Black an easy game.",
+      "moves": [
+        { "san": "e4", "uci": "e2e4", "fen": "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1", "explanation": "White plays e4." },
+        { "san": "c6", "uci": "c7c6", "fen": "rnbqkbnr/pp1ppppp/2p5/8/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2", "explanation": "We play c6." },
+        { "san": "Nc3", "uci": "b1c3", "fen": "rnbqkbnr/pp1ppppp/2p5/8/4P3/2N5/PPPP1PPP/R1BQKBNR b KQkq - 1 2", "explanation": "White develops the knight without d4." }
+      ],
+      "refutation": "Simply play d5 and achieve a perfectly comfortable position. Without d4 established, White can't control the center firmly."
+    }
+  ],
+  "trapsToKnow": [
+    {
+      "name": "The Bf5 Before e6 Principle",
+      "description": "In the Classical Caro-Kann, beginners often forget to play Bf5 before e6, accidentally locking in their bishop.",
+      "moves": [
+        { "san": "Nxe4", "uci": "c3e4", "fen": "rnbqkbnr/pp2pppp/2p5/8/3PN3/8/PPP2PPP/R1BQKBNR b KQkq - 0 4", "explanation": "White recaptures with the knight. This is the critical moment." },
+        { "san": "Bf5", "uci": "c8f5", "fen": "rn1qkbnr/pp2pppp/2p5/5b2/3PN3/8/PPP2PPP/R1BQKBNR w KQkq - 1 5", "explanation": "Bf5 NOW, before e6! This is the entire point of the Caro-Kann." }
+      ],
+      "lesson": "Always remember: in the Classical Caro-Kann, you MUST play Bf5 before e6 or you get a French Defense with an extra tempo for White — which is much worse!"
+    }
+  ]
 }

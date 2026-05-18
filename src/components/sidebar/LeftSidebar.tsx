@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Separator } from '@/components/ui/separator'
 import { Slider } from '@/components/ui/slider'
+import { Switch } from '@/components/ui/switch'
 import { cn } from '@/lib/utils'
 import type { CoachingStyle } from '@/coaching/deepCoach'
 
@@ -28,6 +29,14 @@ export interface LeftSidebarProps {
   engineStatus: 'loading' | 'ready'
   coachingStyle?: CoachingStyle
   onCoachingStyleChange?: (s: CoachingStyle) => void
+  allowPremoves?: boolean
+  onAllowPremovesChange?: (v: boolean) => void
+  arrowsMaster?: boolean
+  onArrowsMasterChange?: (v: boolean) => void
+  arrowsBest?: boolean
+  onArrowsBestChange?: (v: boolean) => void
+  arrowsThreats?: boolean
+  onArrowsThreatsChange?: (v: boolean) => void
 }
 
 const COACH_MODES: ReadonlyArray<{ value: CoachMode; label: string }> = [
@@ -43,7 +52,7 @@ const COLOR_OPTIONS: ReadonlyArray<{ value: UserColor; label: string }> = [
 ]
 
 const SECTION_LABEL =
-  'text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-neutral-500'
+  'text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground'
 
 export function LeftSidebar({
   elo,
@@ -58,9 +67,18 @@ export function LeftSidebar({
   engineStatus,
   coachingStyle,
   onCoachingStyleChange,
+  allowPremoves,
+  onAllowPremovesChange,
+  arrowsMaster,
+  onArrowsMasterChange,
+  arrowsBest,
+  onArrowsBestChange,
+  arrowsThreats,
+  onArrowsThreatsChange,
 }: LeftSidebarProps) {
   const ready = engineStatus === 'ready'
   const styleDisabled = coachMode !== 'full'
+  const premovesDisabled = coachMode === 'full'
 
   return (
     <Card className="w-full">
@@ -74,7 +92,7 @@ export function LeftSidebar({
             <Label htmlFor="engine-elo" className={SECTION_LABEL}>
               Engine Elo
             </Label>
-            <span className="font-mono text-sm tabular-nums text-neutral-800">
+            <span className="font-mono text-sm tabular-nums text-foreground">
               {elo}
             </span>
           </div>
@@ -89,7 +107,7 @@ export function LeftSidebar({
               if (typeof next === 'number') onEloChange(next)
             }}
           />
-          <div className="flex justify-between text-[0.65rem] font-medium uppercase tracking-wider text-neutral-400">
+          <div className="flex justify-between text-[0.65rem] font-medium uppercase tracking-wider text-muted-foreground">
             <span>Beginner</span>
             <span>Master</span>
           </div>
@@ -107,10 +125,10 @@ export function LeftSidebar({
                 key={opt.value}
                 htmlFor={`color-${opt.value}`}
                 className={cn(
-                  'flex cursor-pointer items-center justify-center gap-2 rounded-md border border-neutral-200 bg-white px-2 py-2 text-xs font-medium text-neutral-700 transition-colors',
-                  'hover:border-neutral-300 hover:bg-neutral-50',
+                  'flex cursor-pointer items-center justify-center gap-2 rounded-md border border-border bg-card px-2 py-2 text-xs font-medium text-foreground transition-colors',
+                  'hover:border-border hover:bg-muted',
                   color === opt.value &&
-                    'border-neutral-900 bg-neutral-900 text-white hover:bg-neutral-900',
+                    'border-primary bg-primary text-primary-foreground hover:bg-primary',
                 )}
               >
                 <RadioGroupItem
@@ -126,7 +144,7 @@ export function LeftSidebar({
 
         <section className="space-y-3">
           <span className={SECTION_LABEL}>Coach</span>
-          <div className="inline-flex w-full rounded-md bg-neutral-100 p-1">
+          <div className="inline-flex w-full rounded-md bg-muted p-1">
             {COACH_MODES.map((m) => (
               <Button
                 key={m.value}
@@ -138,7 +156,7 @@ export function LeftSidebar({
                   'flex-1 rounded-[6px] text-xs font-medium',
                   coachMode === m.value
                     ? 'shadow-sm'
-                    : 'text-neutral-600 hover:bg-white hover:text-neutral-900',
+                    : 'text-muted-foreground hover:bg-card hover:text-foreground',
                 )}
               >
                 {m.label}
@@ -173,13 +191,99 @@ export function LeftSidebar({
           </section>
         )}
 
+        {onAllowPremovesChange !== undefined && (
+          <section className="space-y-2">
+            <span className={SECTION_LABEL}>Premoves</span>
+            <div className="flex items-center gap-3">
+              <Switch
+                id="allow-premoves"
+                checked={!!allowPremoves}
+                onCheckedChange={onAllowPremovesChange}
+                disabled={premovesDisabled}
+                size="sm"
+              />
+              <Label
+                htmlFor="allow-premoves"
+                className={cn(
+                  'cursor-pointer text-sm',
+                  premovesDisabled && 'cursor-not-allowed opacity-50',
+                )}
+              >
+                Allow premoves
+              </Label>
+            </div>
+            {premovesDisabled ? (
+              <p className="text-xs text-warning">
+                Disabled while coach mode is &ldquo;full&rdquo; — pre-move coaching needs your full turn.
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Click during opponent&rsquo;s turn to queue your next move.
+              </p>
+            )}
+          </section>
+        )}
+
+        {onArrowsMasterChange !== undefined && (
+          <section className="space-y-2">
+            <span className={SECTION_LABEL}>Board Arrows</span>
+            <div className="flex items-center gap-3">
+              <Switch
+                id="arrows-master"
+                checked={!!arrowsMaster}
+                onCheckedChange={onArrowsMasterChange}
+                size="sm"
+              />
+              <Label htmlFor="arrows-master" className="cursor-pointer text-sm">
+                Show arrows
+              </Label>
+            </div>
+            <div className={cn('space-y-2 pl-1', !arrowsMaster && 'pointer-events-none opacity-40')}>
+              {onArrowsBestChange !== undefined && (
+                <div className="flex items-center gap-3">
+                  <Switch
+                    id="arrows-best"
+                    checked={!!arrowsBest}
+                    onCheckedChange={onArrowsBestChange}
+                    disabled={!arrowsMaster}
+                    size="sm"
+                  />
+                  <Label
+                    htmlFor="arrows-best"
+                    className={cn('cursor-pointer text-sm', !arrowsMaster && 'cursor-not-allowed')}
+                  >
+                    Best move suggestion
+                  </Label>
+                </div>
+              )}
+              {onArrowsThreatsChange !== undefined && (
+                <div className="flex items-center gap-3">
+                  <Switch
+                    id="arrows-threats"
+                    checked={!!arrowsThreats}
+                    onCheckedChange={onArrowsThreatsChange}
+                    disabled={!arrowsMaster}
+                    size="sm"
+                  />
+                  <Label
+                    htmlFor="arrows-threats"
+                    className={cn('cursor-pointer text-sm', !arrowsMaster && 'cursor-not-allowed')}
+                  >
+                    Threat warnings
+                  </Label>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
         <Separator />
 
         <section className="space-y-2">
           <Button
             type="button"
             onClick={onNewGame}
-            className="w-full"
+            className="w-full transition-transform duration-150 hover:scale-[1.02]"
             size="lg"
           >
             New Game
@@ -196,7 +300,7 @@ export function LeftSidebar({
           </Button>
         </section>
 
-        <div className="flex items-center gap-2 pt-1 text-xs text-neutral-500">
+        <div className="flex items-center gap-2 pt-1 text-xs text-muted-foreground">
           <span
             className={cn(
               'relative inline-flex h-2 w-2 rounded-full',

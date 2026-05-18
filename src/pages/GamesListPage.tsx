@@ -8,8 +8,8 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 
 function resultIcon(result: GameResult, userColor: 'white' | 'black') {
-  if (result === 'ongoing') return <Minus className="w-4 h-4 text-zinc-400" />
-  if (result === '1/2-1/2') return <Minus className="w-4 h-4 text-zinc-500" />
+  if (result === 'ongoing') return <Minus className="w-4 h-4 text-muted-foreground" />
+  if (result === '1/2-1/2') return <Minus className="w-4 h-4 text-muted-foreground" />
   const userWon =
     (result === '1-0' && userColor === 'white') ||
     (result === '0-1' && userColor === 'black')
@@ -76,7 +76,7 @@ export function GamesListPage() {
           const badgeClass = isWin
             ? 'bg-emerald-500 text-white hover:bg-emerald-500'
             : isDraw
-              ? 'bg-zinc-500 text-white hover:bg-zinc-500'
+              ? 'bg-muted-foreground text-background hover:bg-muted-foreground'
               : 'bg-red-500 text-white hover:bg-red-500'
           return (
             <Card

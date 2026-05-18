@@ -17,6 +17,7 @@ import { Separator } from '@/components/ui/separator'
 import { cn } from '@/lib/utils'
 import { ExplainBox } from './ExplainBox'
 import { CoachMessage } from './CoachMessage'
+import { TellMoreButton } from './TellMoreButton'
 
 export interface CoachPanelProps {
   mode: 'off' | 'warnings' | 'full'
@@ -32,8 +33,21 @@ export interface CoachPanelProps {
   explain?: UseExplainResult
   /** Deep coach messages to render above legacy sections. */
   messages?: LiveCoachMessage[]
+  /**
+   * Legacy Tell-Me-More callback used when the parent owns a custom follow-up
+   * prompt (e.g., PlayPage's `followUp` flow). When `requestDeepDive` is also
+   * provided, `requestDeepDive` wins.
+   */
   onTellMore?: (id: string) => void
+  /**
+   * Preferred Tell-Me-More handler from `useDeepCoach`. When supplied, the
+   * panel renders a `TellMoreButton` under each completed brief message and
+   * invokes this callback with the source message's id.
+   */
+  requestDeepDive?: (id: string) => void
   onQuieter?: () => void
+  /** Flags indicating which arrow types are currently visible on the board. */
+  coachFlags?: { hasBestArrow?: boolean; hasThreatArrow?: boolean }
 }
 
 const PIECE_GLYPH: Record<PieceSymbol, string> = {
@@ -55,7 +69,7 @@ const PIECE_NAME: Record<PieceSymbol, string> = {
 }
 
 const SECTION_LABEL =
-  'text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-neutral-500'
+  'text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground'
 
 const MODE_LABEL: Record<CoachPanelProps['mode'], string> = {
   off: 'Off',
@@ -75,10 +89,19 @@ export function CoachPanel({
   explain,
   messages,
   onTellMore,
+  requestDeepDive,
   onQuieter,
+  coachFlags,
 }: CoachPanelProps) {
   const isOff = mode === 'off'
   const hasMessages = messages && messages.length > 0
+
+  // Prefer the new deep-dive handler; fall back to the legacy followUp callback.
+  const tellMoreHandler = requestDeepDive ?? onTellMore
+  // Quieter wiring is currently unused at the panel level (lives in PlayPage's
+  // mode toggle). Keep the prop accepted for back-compat but reference it so
+  // the type-checker treats it as intentionally consumed.
+  void onQuieter
 
   return (
     <Card className="w-[560px]">
@@ -90,16 +113,16 @@ export function CoachPanel({
               className={cn(
                 'rounded-full border px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wider',
                 isOff
-                  ? 'border-neutral-200 bg-neutral-50 text-neutral-500'
-                  : 'border-neutral-900 bg-neutral-900 text-white',
+                  ? 'border-border bg-muted text-muted-foreground'
+                  : 'border-foreground bg-foreground text-background',
               )}
             >
               {MODE_LABEL[mode]}
             </span>
             {thinking ? (
-              <span className="inline-flex items-center gap-1.5 text-[0.7rem] font-medium text-neutral-500">
+              <span className="inline-flex items-center gap-1.5 text-[0.7rem] font-medium text-muted-foreground">
                 <span
-                  className="inline-block size-2 animate-pulse rounded-full bg-neutral-400"
+                  className="inline-block size-2 animate-pulse rounded-full bg-muted-foreground"
                   aria-hidden="true"
                 />
                 thinking…
@@ -122,22 +145,26 @@ export function CoachPanel({
         {/* Deep coach messages rendered above legacy sections */}
         {hasMessages && (
           <div className="space-y-3">
-            {messages!.map((msg) => (
-              <CoachMessage
-                key={msg.id}
-                message={msg}
-                onTellMore={() => onTellMore?.(msg.id)}
-                onQuieter={() => onQuieter?.()}
-              />
-            ))}
+            {messages!.map((msg) => {
+              const isBrief = msg.trigger !== 'tell_me_more'
+              const showTellMore = isBrief && !msg.streaming && !!tellMoreHandler
+              return (
+                <div key={msg.id} className="space-y-1">
+                  <CoachMessage message={msg} flags={coachFlags} />
+                  {showTellMore && (
+                    <TellMoreButton onClick={() => tellMoreHandler?.(msg.id)} />
+                  )}
+                </div>
+              )
+            })}
             <Separator />
           </div>
         )}
 
         {isOff ? (
-          <p className="text-sm text-neutral-500">
+          <p className="text-sm text-muted-foreground">
             Coaching is off.{' '}
-            <span className="text-neutral-400">
+            <span className="text-muted-foreground/70">
               Enable Warnings or Full in the left panel to see threats and
               blunder alerts.
             </span>
@@ -181,7 +208,7 @@ function BeforeMoveSection({
     <section className="space-y-2">
       <span className={SECTION_LABEL}>Before your move</span>
       {empty ? (
-        <p className="text-sm text-neutral-500">
+        <p className="text-sm text-muted-foreground">
           No immediate threats or captures.
         </p>
       ) : (
@@ -190,7 +217,7 @@ function BeforeMoveSection({
           {mode === 'full' ? (
             <CapturesList captures={captures} />
           ) : (
-            <div className="rounded-md border border-dashed border-neutral-200 p-3 text-xs text-neutral-400">
+            <div className="rounded-md border border-dashed border-border p-3 text-xs text-muted-foreground">
               Switch Coach to Full to see capture suggestions.
             </div>
           )}
@@ -207,7 +234,7 @@ function ThreatsList({ threats }: { threats: ThreatenedPiece[] }) {
         Threats
       </div>
       {threats.length === 0 ? (
-        <p className="text-xs text-neutral-500">None.</p>
+        <p className="text-xs text-muted-foreground">None.</p>
       ) : (
         <ul className="space-y-1.5">
           {threats.map((t) => (
@@ -248,7 +275,7 @@ function CapturesList({ captures }: { captures: AvailableCapture[] }) {
         Captures
       </div>
       {captures.length === 0 ? (
-        <p className="text-xs text-neutral-500">None available.</p>
+        <p className="text-xs text-muted-foreground">None available.</p>
       ) : (
         <ul className="space-y-1.5">
           {captures.map((c) => (
@@ -294,7 +321,7 @@ function AfterMoveSection({
       return (
         <section className="space-y-2">
           <span className={SECTION_LABEL}>After your move</span>
-          <p className="text-sm text-neutral-500">OK so far.</p>
+          <p className="text-sm text-muted-foreground">OK so far.</p>
         </section>
       )
     }

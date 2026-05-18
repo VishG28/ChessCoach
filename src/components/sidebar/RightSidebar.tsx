@@ -8,6 +8,12 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
 import { cn } from '@/lib/utils'
+import type { MoveSource } from '@/games/types'
+
+export interface MoveSourceInfo {
+  source: MoveSource
+  bookWeight?: number
+}
 
 export interface RightSidebarProps {
   /** Verbose chess.js history (Move[]). */
@@ -18,6 +24,11 @@ export interface RightSidebarProps {
   mateIn?: number | null
   /** Highlight which ply index is selected. -1 or null = none. */
   activePly?: number | null
+  /**
+   * Optional per-move provenance keyed by 0-based ply index (matches the index
+   * into `history`). When `source === 'book'` a 📖 badge is rendered.
+   */
+  moveSources?: ReadonlyMap<number, MoveSourceInfo>
 }
 
 /** Convert centipawn evaluation to White's share (0..1) using a logistic. */
@@ -68,6 +79,7 @@ export function RightSidebar({
   evalCpWhitePov,
   mateIn = null,
   activePly = null,
+  moveSources,
 }: RightSidebarProps) {
   const share = evalToWhiteShare(evalCpWhitePov, mateIn)
   const whitePct = Math.max(0, Math.min(1, share)) * 100
@@ -84,19 +96,19 @@ export function RightSidebar({
 
       <CardContent className="space-y-4">
         <section className="space-y-2">
-          <div className="flex items-center justify-between text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-neutral-500">
+          <div className="flex items-center justify-between text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
             <span>Evaluation</span>
             <span
               className={cn(
                 'font-mono text-sm tabular-nums',
-                evalFavorsWhite ? 'text-neutral-900' : 'text-neutral-500',
+                evalFavorsWhite ? 'text-foreground' : 'text-muted-foreground',
               )}
             >
               {evalLabel}
             </span>
           </div>
           <div
-            className="relative h-3 overflow-hidden rounded-full bg-neutral-900 ring-1 ring-inset ring-black/10"
+            className="relative h-3 overflow-hidden rounded-full bg-foreground ring-1 ring-inset ring-black/10"
             role="meter"
             aria-label="Position evaluation, White's share"
             aria-valuemin={0}
@@ -104,43 +116,49 @@ export function RightSidebar({
             aria-valuenow={Math.round(whitePct)}
           >
             <div
-              className="absolute inset-y-0 right-0 bg-white"
+              className="absolute inset-y-0 right-0 bg-white transition-all duration-300 ease-out"
               style={{ width: `${whitePct}%` }}
             />
-            <div className="pointer-events-none absolute left-1/2 top-0 h-full w-px bg-neutral-400/40" />
+            <div className="pointer-events-none absolute left-1/2 top-0 h-full w-px bg-muted-foreground/40" />
           </div>
         </section>
 
         <Separator />
 
         <section className="space-y-2">
-          <span className="text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-neutral-500">
+          <span className="text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
             Moves
           </span>
-          <ScrollArea className="h-[480px] rounded-md border border-neutral-100">
+          <ScrollArea className="h-[480px] rounded-md border border-border">
             {pairs.length === 0 ? (
-              <p className="px-3 py-6 text-center text-sm text-neutral-400">
+              <p className="px-3 py-6 text-center text-sm text-muted-foreground">
                 Make a move to start.
               </p>
             ) : (
-              <ol className="divide-y divide-neutral-100">
+              <ol className="divide-y divide-border">
                 {pairs.map((pair) => (
                   <li
                     key={pair.number}
                     className="grid grid-cols-[2.25rem_1fr_1fr] items-center gap-1 px-3 py-1.5 font-mono text-sm"
                   >
-                    <span className="text-xs font-medium text-neutral-400 tabular-nums">
+                    <span className="text-xs font-medium text-muted-foreground tabular-nums">
                       {pair.number}.
                     </span>
                     <PlyCell
                       move={pair.white}
                       ply={pair.whitePly}
                       activePly={activePly}
+                      sourceInfo={
+                        pair.whitePly != null ? moveSources?.get(pair.whitePly) : undefined
+                      }
                     />
                     <PlyCell
                       move={pair.black}
                       ply={pair.blackPly}
                       activePly={activePly}
+                      sourceInfo={
+                        pair.blackPly != null ? moveSources?.get(pair.blackPly) : undefined
+                      }
                     />
                   </li>
                 ))}
@@ -157,25 +175,36 @@ interface PlyCellProps {
   move: Move | null
   ply: number | null
   activePly: number | null
+  sourceInfo?: MoveSourceInfo
 }
 
-function PlyCell({ move, ply, activePly }: PlyCellProps) {
+function PlyCell({ move, ply, activePly, sourceInfo }: PlyCellProps) {
   if (move == null || ply == null) {
-    return <span className="text-neutral-300">·</span>
+    return <span className="text-muted-foreground">·</span>
   }
   const isActive = activePly === ply
+  const isBook = sourceInfo?.source === 'book'
   return (
     <button
       type="button"
       className={cn(
         'rounded px-1.5 py-0.5 text-left transition-colors',
         isActive
-          ? 'bg-neutral-900 text-white'
-          : 'text-neutral-800 hover:bg-neutral-100',
+          ? 'bg-foreground text-background'
+          : 'text-foreground hover:bg-muted',
       )}
       data-ply={ply}
     >
       {move.san}
+      {isBook && (
+        <span
+          title={`Lichess database, ${Math.round((sourceInfo?.bookWeight ?? 0) * 100)}% frequency`}
+          className="ml-1 text-xs"
+          aria-label="book move"
+        >
+          📖
+        </span>
+      )}
     </button>
   )
 }

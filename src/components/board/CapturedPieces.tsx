@@ -51,7 +51,7 @@ export function CapturedPieces({ history, side, userColor }: CapturedPiecesProps
         return Array.from({ length: count }, (_, i) => (
           <span
             key={`${piece}-${i}`}
-            className="text-base leading-none"
+            className="animate-in fade-in duration-200 text-base leading-none"
             aria-hidden="true"
             style={{ fontSize: '16px' }}
           >

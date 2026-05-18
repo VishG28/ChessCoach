@@ -1,5 +1,6 @@
 // src/coaching/useDeepCoach.ts
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { Chess, type Square } from 'chess.js'
 import {
   type CoachingStyle,
   type PreMoveContext,
@@ -10,6 +11,34 @@ import {
 } from './deepCoach'
 import { useApiKey } from './apiKey'
 import { useCostCounter } from './costCounter'
+
+/** Convert a UCI principal variation to SAN, stopping if any move is illegal. */
+export function uciPvToSan(fen: string, pvUci: string[], maxPlies = 6): string[] {
+  const c = new Chess(fen)
+  const out: string[] = []
+  for (const uci of pvUci.slice(0, maxPlies)) {
+    const from = uci.slice(0, 2) as Square
+    const to = uci.slice(2, 4) as Square
+    const promotion = uci.length >= 5 ? (uci[4] as 'q' | 'r' | 'b' | 'n') : undefined
+    const move = c.move({ from, to, promotion })
+    if (!move) break
+    out.push(move.san)
+  }
+  return out
+}
+
+/** Convert a single UCI move to SAN at the given FEN, falling back to UCI on error. */
+export function uciToSan(fen: string, uci: string): string {
+  try {
+    const c = new Chess(fen)
+    const from = uci.slice(0, 2) as Square
+    const to = uci.slice(2, 4) as Square
+    const promotion = uci.length >= 5 ? (uci[4] as 'q' | 'r' | 'b' | 'n') : undefined
+    return c.move({ from, to, promotion })?.san ?? uci
+  } catch {
+    return uci
+  }
+}
 
 const DEBOUNCE_MS = 800
 const GLOBAL_RATE_MS = 3000
@@ -45,6 +74,12 @@ export interface FireOpts {
   followUp?: string
 }
 
+interface StoredCoachContext {
+  style: CoachingStyle
+  preMove?: PreMoveContext
+  postMove?: PostMoveContext
+}
+
 export function useDeepCoach({ style, enabled, onComplete }: UseDeepCoachOpts) {
   const { getKey } = useApiKey()
   const { add: addCost } = useCostCounter()
@@ -53,10 +88,16 @@ export function useDeepCoach({ style, enabled, onComplete }: UseDeepCoachOpts) {
   const inFlightRef = useRef<AbortController | null>(null)
   const lastCallAtRef = useRef<number>(0)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  /** Per-message context cache so Tell-Me-More can rebuild the deep-dive request. */
+  const contextById = useRef<Map<string, StoredCoachContext>>(new Map())
+  /** Independent abort controller for deep-dive requests so they don't collide with brief streams. */
+  const deepDiveAcRef = useRef<AbortController | null>(null)
 
   const cancel = useCallback((): void => {
     inFlightRef.current?.abort()
     inFlightRef.current = null
+    deepDiveAcRef.current?.abort()
+    deepDiveAcRef.current = null
     if (debounceRef.current) {
       clearTimeout(debounceRef.current)
       debounceRef.current = null
@@ -84,6 +125,12 @@ export function useDeepCoach({ style, enabled, onComplete }: UseDeepCoachOpts) {
       fen: opts.fen,
     }
     setMessages((prev) => [...prev, initial])
+    // Stash the originating context so a later Tell-Me-More can re-issue with deep_dive depth.
+    contextById.current.set(id, {
+      style,
+      preMove: opts.preMove,
+      postMove: opts.postMove,
+    })
 
     try {
       const gen = streamCoachMessage(
@@ -117,6 +164,7 @@ export function useDeepCoach({ style, enabled, onComplete }: UseDeepCoachOpts) {
     } catch (e) {
       if (ac.signal.aborted) {
         setMessages((prev) => prev.filter((m) => m.id !== id))
+        contextById.current.delete(id)
         return
       }
       const errMsg = e instanceof Error ? e.message : 'Coach error'
@@ -147,5 +195,74 @@ export function useDeepCoach({ style, enabled, onComplete }: UseDeepCoachOpts) {
     [enabled, getKey, onComplete, runOnce],
   )
 
-  return { messages, fire, cancel }
+  /**
+   * Re-issue the original prompt for `sourceId` at `deep_dive` depth and append
+   * a new streaming message. Returns silently if the source message's context
+   * has not been stored, the API key is missing, or coaching is disabled.
+   */
+  const requestDeepDive = useCallback(async (sourceId: string): Promise<void> => {
+    if (!enabled) return
+    const ctx = contextById.current.get(sourceId)
+    if (!ctx) return
+    const apiKey = getKey()
+    if (!apiKey) return
+
+    deepDiveAcRef.current?.abort()
+    const ac = new AbortController()
+    deepDiveAcRef.current = ac
+
+    const fen = ctx.preMove?.fen ?? ctx.postMove?.fenAfter ?? ''
+    const newId = `tell_me_more-${fen}-${Date.now()}`
+    const initial: LiveCoachMessage = {
+      id: newId,
+      trigger: 'tell_me_more',
+      style: ctx.style,
+      // Severity field stays on the legacy 'detail' rung; the prompt-depth
+      // switch happens via `streamCoachMessage`'s `depth` option below.
+      depth: 'detail',
+      content: '',
+      streaming: true,
+      timestamp: Date.now(),
+      fen,
+    }
+    setMessages((prev) => [...prev, initial])
+    // Store this context too, so a deep-dive can spawn another deep-dive if needed.
+    contextById.current.set(newId, ctx)
+
+    try {
+      const gen = streamCoachMessage(
+        {
+          apiKey,
+          style: ctx.style,
+          depth: 'deep_dive',
+          preMove: ctx.preMove,
+          postMove: ctx.postMove,
+          signal: ac.signal,
+        },
+        (u: StreamCoachUsage) => addCost(usdCost(u)),
+      )
+      let acc = ''
+      while (true) {
+        const next = await gen.next()
+        if (next.done) break
+        acc += next.value
+        setMessages((prev) => prev.map((m) => (m.id === newId ? { ...m, content: acc } : m)))
+      }
+      const finalMsg: LiveCoachMessage = { ...initial, content: acc, streaming: false }
+      setMessages((prev) => prev.map((m) => (m.id === newId ? finalMsg : m)))
+      onComplete?.(finalMsg)
+    } catch (e) {
+      if (ac.signal.aborted) {
+        setMessages((prev) => prev.filter((m) => m.id !== newId))
+        contextById.current.delete(newId)
+        return
+      }
+      const errMsg = e instanceof Error ? e.message : 'Coach error'
+      setMessages((prev) =>
+        prev.map((m) => (m.id === newId ? { ...m, content: errMsg, streaming: false } : m)),
+      )
+    }
+  }, [enabled, getKey, addCost, onComplete])
+
+  return { messages, fire, requestDeepDive, cancel }
 }

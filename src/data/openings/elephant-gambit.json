@@ -1,0 +1,50 @@
+{
+  "id": "elephant-gambit",
+  "name": "Elephant Gambit",
+  "eco": "C40",
+  "popularityRank": 99,
+  "category": "underrated",
+  "side": "black",
+  "startingMoves": [
+    "e4",
+    "e5",
+    "Nf3",
+    "d5"
+  ],
+  "description": "Placeholder — run `npm run openings:generate -- --id elephant-gambit` to populate.",
+  "whyPlayIt": "Placeholder — see description.",
+  "keyIdeas": [
+    "Placeholder idea 1.",
+    "Placeholder idea 2.",
+    "Placeholder idea 3."
+  ],
+  "mainLine": [
+    {
+      "san": "e4",
+      "uci": "e2e4",
+      "fen": "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1",
+      "explanation": "Placeholder explanation."
+    },
+    {
+      "san": "e5",
+      "uci": "e7e5",
+      "fen": "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2",
+      "explanation": "Placeholder explanation."
+    },
+    {
+      "san": "Nf3",
+      "uci": "g1f3",
+      "fen": "rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2",
+      "explanation": "Placeholder explanation."
+    },
+    {
+      "san": "d5",
+      "uci": "d7d5",
+      "fen": "rnbqkbnr/ppp2ppp/8/3pp3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 0 3",
+      "explanation": "Placeholder explanation."
+    }
+  ],
+  "variations": [],
+  "commonAmateurResponses": [],
+  "trapsToKnow": []
+}

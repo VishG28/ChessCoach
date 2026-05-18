@@ -1,3 +1,11 @@
+function assertHeaderSafe(apiKey: string): void {
+  if (!/^[\x00-\x7F]+$/.test(apiKey)) {
+    throw new Error(
+      'API key contains invalid characters. Re-enter it from console.anthropic.com.',
+    )
+  }
+}
+
 export interface BlunderContext {
   fen_before: string
   user_move: string        // SAN
@@ -26,6 +34,7 @@ export async function explainBlunder(
   apiKey: string,
   signal?: AbortSignal,
 ): Promise<string> {
+  assertHeaderSafe(apiKey)
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -54,22 +63,32 @@ export async function explainBlunder(
 
 /** Cheap key validation — does a tiny ping with low max_tokens. */
 export async function pingAnthropic(apiKey: string): Promise<void> {
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true',
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 5,
-      messages: [{ role: 'user', content: 'Hi' }],
-    }),
-  })
+  assertHeaderSafe(apiKey)
+  let res: Response
+  try {
+    res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5',
+        max_tokens: 1,
+        messages: [{ role: 'user', content: 'ping' }],
+      }),
+    })
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e)
+    throw new Error(`Couldn't reach Anthropic. Check connection. (${msg})`)
+  }
+  if (res.status === 401) {
+    throw new Error('API key rejected. Verify it is correct and has credit.')
+  }
   if (!res.ok) {
     const text = await res.text().catch(() => '')
-    throw new Error(`API ${res.status}: ${text || res.statusText}`)
+    throw new Error(`Anthropic API ${res.status}: ${text || res.statusText}`)
   }
 }

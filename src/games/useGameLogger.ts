@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, type MutableRefObject } from 'react'
 import { toast } from 'sonner'
 import type { UseChessGameResult } from '@/lib/useChessGame'
 import { analyzePosition } from '@/engine/analysisEngine'
@@ -9,17 +9,36 @@ import {
   setGamePgn,
   finalizeGame,
   getGame,
+  clearGameCoaching,
+  restoreGameCoaching,
 } from './gameStore'
 import { classify } from './classification'
-import type { CoachMessageRecord, GameResult } from './types'
+import type { CoachMessageRecord, GameResult, MoveSource } from './types'
+
+export interface OpponentMoveMeta {
+  source: MoveSource
+  engineModel: string
+  bookWeight?: number
+}
 
 export interface GameLoggerInput {
   game: UseChessGameResult
   engineElo: number
   userColor: 'white' | 'black'
   coachMode: 'off' | 'warnings' | 'full'
+  /** Engine family used to generate opponent moves. */
+  engine?: 'stockfish' | 'maia'
+  /** Specific model identifier (e.g. 'stockfish-18', 'maia-1300'). */
+  engineModel?: string
   /** Last coach message keyed by ply. */
   coachMessage?: { ply: number; text: string } | null
+  /**
+   * Provenance metadata for the most recently selected opponent move.
+   * The logger reads this ref when it observes a new opponent move in
+   * `game.history` and then clears it so the value cannot leak to a
+   * subsequent move.
+   */
+  lastOpponentMetaRef?: MutableRefObject<OpponentMoveMeta | null>
 }
 
 export interface GameLoggerOutput {
@@ -36,7 +55,16 @@ function mapGameResult(game: UseChessGameResult): GameResult {
 }
 
 export function useGameLogger(input: GameLoggerInput): GameLoggerOutput {
-  const { game, engineElo, userColor, coachMode, coachMessage } = input
+  const {
+    game,
+    engineElo,
+    userColor,
+    coachMode,
+    engine,
+    engineModel,
+    coachMessage,
+    lastOpponentMetaRef,
+  } = input
 
   const currentGameIdRef = useRef<string | null>(null)
   const prevHistoryLengthRef = useRef(0)
@@ -47,6 +75,8 @@ export function useGameLogger(input: GameLoggerInput): GameLoggerOutput {
   const coachMessageRef = useRef(coachMessage)
   coachMessageRef.current = coachMessage
 
+  const userColorChar: 'w' | 'b' = userColor === 'white' ? 'w' : 'b'
+
   useEffect(() => {
     const currentLen = game.history.length
     const prevLen = prevHistoryLengthRef.current
@@ -56,7 +86,13 @@ export function useGameLogger(input: GameLoggerInput): GameLoggerOutput {
     if (currentLen > prevLen) {
       // Lazy-create game on first move
       if (currentGameIdRef.current === null) {
-        const newGame = startNewGame({ userColor, engineElo, coachMode })
+        const newGame = startNewGame({
+          userColor,
+          engineElo,
+          coachMode,
+          ...(engine ? { engine } : {}),
+          ...(engineModel ? { engineModel } : {}),
+        })
         currentGameIdRef.current = newGame.id
       }
 
@@ -71,7 +107,19 @@ export function useGameLogger(input: GameLoggerInput): GameLoggerOutput {
         const fen_before = move.before
         const fen_after = move.after
 
-        // Append synchronously with basic fields
+        // Determine provenance: user vs opponent.
+        // Opponent meta comes from the lastOpponentMetaRef (set by PlayPage just
+        // before makeMove). Consumed once, then cleared to avoid leaking into
+        // the next move.
+        const isUserMove = side === userColorChar
+        let meta: OpponentMoveMeta | null = null
+        if (!isUserMove && lastOpponentMetaRef?.current) {
+          meta = lastOpponentMetaRef.current
+          lastOpponentMetaRef.current = null
+        }
+        const sourceField: MoveSource = isUserMove ? 'user' : (meta?.source ?? 'stockfish')
+
+        // Append synchronously with basic fields + provenance
         appendMove(gameId, {
           ply,
           san: move.san,
@@ -80,6 +128,9 @@ export function useGameLogger(input: GameLoggerInput): GameLoggerOutput {
           fen_after,
           timestamp: Date.now(),
           side,
+          source: sourceField,
+          ...(meta?.engineModel ? { engineModel: meta.engineModel } : {}),
+          ...(meta?.bookWeight !== undefined ? { bookWeight: meta.bookWeight } : {}),
         })
 
         // Fire-and-forget async analysis
@@ -150,12 +201,39 @@ export function useGameLogger(input: GameLoggerInput): GameLoggerOutput {
     const justEnded = isOver && !prevIsGameOverRef.current && currentLen > 0
 
     if ((wasReset || justEnded) && currentGameIdRef.current !== null) {
+      const finalizedGameId = currentGameIdRef.current
       const result = mapGameResult(game)
-      finalizeGame(currentGameIdRef.current, result, game.pgn)
+      finalizeGame(finalizedGameId, result, game.pgn)
       // Fire game-saved toast once per game (keyed by game id)
-      if (justEnded && gameSavedToastedRef.current !== currentGameIdRef.current) {
-        gameSavedToastedRef.current = currentGameIdRef.current
-        toast.success('Game saved')
+      if (justEnded && gameSavedToastedRef.current !== finalizedGameId) {
+        gameSavedToastedRef.current = finalizedGameId
+        const keepCoaching = ((): boolean => {
+          try {
+            return localStorage.getItem('cc.keepCoaching.v1') === '1'
+          } catch {
+            return false
+          }
+        })()
+
+        if (!keepCoaching) {
+          const snapshot = clearGameCoaching(finalizedGameId)
+          toast('Game saved. Coaching cleared.', {
+            duration: 10000,
+            ...(snapshot
+              ? {
+                  action: {
+                    label: 'Undo',
+                    onClick: () => {
+                      restoreGameCoaching(finalizedGameId, snapshot)
+                      toast.success('Coaching restored')
+                    },
+                  },
+                }
+              : {}),
+          })
+        } else {
+          toast.success('Game saved')
+        }
       }
       if (wasReset) {
         currentGameIdRef.current = null
