@@ -126,6 +126,11 @@ export function PlayPage() {
   }
   const [debugOpen, setDebugOpen] = useState(false)
   const [engineThinking, setEngineThinking] = useState(false)
+  // Incremented when the engine returns a UCI that is illegal on the current
+  // board (e.g. because fenBefore drifted from chessRef between request and
+  // apply). Adding this to the engine effect's dep array forces an immediate
+  // retry with the fresh position so the game does not permanently stall.
+  const [engineStallKey, setEngineStallKey] = useState(0)
   const resolvedEngine = resolveEngine(elo)
   const engineMode: 'maia' | 'stockfish' = resolvedEngine.source
 
@@ -492,11 +497,19 @@ export function PlayPage() {
         })
 
         const chosen = parseUciMove(chosenUci)
-        game.makeMove({
+        // chess.js v1 throws on illegal moves; useChessGame.makeMove catches and
+        // returns null. If null, the board has drifted from fenBefore (e.g. a
+        // "Play from here" FEN load raced the async engine request). Increment
+        // engineStallKey to re-trigger this effect with the fresh position.
+        const applied = game.makeMove({
           from: chosen.from as Square,
           to: chosen.to as Square,
           promotion: chosen.promotion,
         })
+        if (!applied) {
+          setEngineStallKey((k) => k + 1)
+          return
+        }
 
         // After the engine move lands, try to execute any queued premove.
         const currentPremove = queuedPremoveRef.current
@@ -535,8 +548,10 @@ export function PlayPage() {
     // `game` is intentionally omitted: it's a new object every render and
     // including it would loop. The fields we read (fen/turn/isGameOver) are
     // in deps; makeMove is stable in behavior even though its identity isn't.
+    // engineStallKey is incremented when the engine returns a move illegal on
+    // the current board; it forces a retry with the fresh position.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [engine, ready, game.fen, game.turn, game.isGameOver, userColor, elo, engineMode, isReviewing])
+  }, [engine, ready, game.fen, game.turn, game.isGameOver, userColor, elo, engineMode, isReviewing, engineStallKey])
 
   const handleUserMove = (
     from: string,
