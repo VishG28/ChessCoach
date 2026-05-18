@@ -12,7 +12,12 @@ import {
 import { useApiKey } from './apiKey'
 import { useCostCounter } from './costCounter'
 
-/** Convert a UCI principal variation to SAN, stopping if any move is illegal. */
+/** Convert a UCI principal variation to SAN, stopping if any move is illegal.
+ *
+ * chess.js v1 throws on illegal moves (unlike v0.x which returned null/false).
+ * Each move is wrapped in try/catch so an out-of-sync PV does not propagate an
+ * unhandled exception to callers.
+ */
 export function uciPvToSan(fen: string, pvUci: string[], maxPlies = 6): string[] {
   const c = new Chess(fen)
   const out: string[] = []
@@ -20,9 +25,14 @@ export function uciPvToSan(fen: string, pvUci: string[], maxPlies = 6): string[]
     const from = uci.slice(0, 2) as Square
     const to = uci.slice(2, 4) as Square
     const promotion = uci.length >= 5 ? (uci[4] as 'q' | 'r' | 'b' | 'n') : undefined
-    const move = c.move({ from, to, promotion })
-    if (!move) break
-    out.push(move.san)
+    try {
+      const move = c.move({ from, to, promotion })
+      if (!move) break
+      out.push(move.san)
+    } catch {
+      // Illegal move in PV (stale or malformed UCI) — stop converting here.
+      break
+    }
   }
   return out
 }
