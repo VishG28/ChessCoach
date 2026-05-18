@@ -254,7 +254,7 @@ export function GameReviewPage() {
   if (game === undefined) {
     return (
       <main className="max-w-[1180px] mx-auto px-6 py-8">
-        <p className="text-zinc-500">Loading…</p>
+        <p className="text-muted-foreground">Loading…</p>
       </main>
     )
   }

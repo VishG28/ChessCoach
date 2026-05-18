@@ -113,7 +113,7 @@ export function MoveDetails({
 
   if (selectedPly === 0 || move === null) {
     return (
-      <div className="p-4 text-sm text-zinc-500 italic">
+      <div className="p-4 text-sm text-muted-foreground italic">
         Select a move to see details.
       </div>
     )
@@ -123,7 +123,7 @@ export function MoveDetails({
   const moverLabel = isUserMove ? 'You played' : 'Engine played'
 
   const classificationLabel = move.classification ? CLASS_LABEL[move.classification] : null
-  const classificationBg = move.classification ? CLASS_BG[move.classification] : 'bg-zinc-100'
+  const classificationBg = move.classification ? CLASS_BG[move.classification] : 'bg-muted'
 
   const bestMoveSan = move.engine_eval_before?.bestMove
     ? uciToSan(move.fen_before, move.engine_eval_before.bestMove)
@@ -142,7 +142,7 @@ export function MoveDetails({
     <div className="p-4 space-y-3 text-sm">
       {/* Mover + classification */}
       <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-zinc-500">{moverLabel}:</span>
+        <span className="text-muted-foreground">{moverLabel}:</span>
         <span className="font-semibold font-mono">{move.san}</span>
         {move.source === 'book' && (
           <span
@@ -155,7 +155,7 @@ export function MoveDetails({
         )}
         {classificationLabel && (
           <span
-            className={`px-2 py-0.5 rounded text-xs font-medium ${classificationBg} text-zinc-700`}
+            className={`px-2 py-0.5 rounded text-xs font-medium ${classificationBg} text-foreground`}
           >
             {classificationLabel}
           </span>
@@ -164,17 +164,17 @@ export function MoveDetails({
 
       {/* Engine prefers */}
       {bestMoveSan && bestMoveSan !== move.san && (
-        <div className="text-zinc-600">
+        <div className="text-muted-foreground">
           Engine prefers:{' '}
-          <span className="font-semibold font-mono text-zinc-800">{bestMoveSan}</span>
+          <span className="font-semibold font-mono text-foreground">{bestMoveSan}</span>
         </div>
       )}
 
       {/* CP loss */}
       {move.centipawn_loss !== undefined && (
-        <div className="text-zinc-600">
+        <div className="text-muted-foreground">
           Centipawn loss:{' '}
-          <span className="font-semibold text-zinc-800">{move.centipawn_loss}</span>
+          <span className="font-semibold text-foreground">{move.centipawn_loss}</span>
         </div>
       )}
 

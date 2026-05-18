@@ -43,7 +43,7 @@ const COLOR_OPTIONS: ReadonlyArray<{ value: UserColor; label: string }> = [
 ]
 
 const SECTION_LABEL =
-  'text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-neutral-500'
+  'text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground'
 
 export function LeftSidebar({
   elo,
@@ -74,7 +74,7 @@ export function LeftSidebar({
             <Label htmlFor="engine-elo" className={SECTION_LABEL}>
               Engine Elo
             </Label>
-            <span className="font-mono text-sm tabular-nums text-neutral-800">
+            <span className="font-mono text-sm tabular-nums text-foreground">
               {elo}
             </span>
           </div>
@@ -89,7 +89,7 @@ export function LeftSidebar({
               if (typeof next === 'number') onEloChange(next)
             }}
           />
-          <div className="flex justify-between text-[0.65rem] font-medium uppercase tracking-wider text-neutral-400">
+          <div className="flex justify-between text-[0.65rem] font-medium uppercase tracking-wider text-muted-foreground">
             <span>Beginner</span>
             <span>Master</span>
           </div>
@@ -107,10 +107,10 @@ export function LeftSidebar({
                 key={opt.value}
                 htmlFor={`color-${opt.value}`}
                 className={cn(
-                  'flex cursor-pointer items-center justify-center gap-2 rounded-md border border-neutral-200 bg-white px-2 py-2 text-xs font-medium text-neutral-700 transition-colors',
-                  'hover:border-neutral-300 hover:bg-neutral-50',
+                  'flex cursor-pointer items-center justify-center gap-2 rounded-md border border-border bg-card px-2 py-2 text-xs font-medium text-foreground transition-colors',
+                  'hover:border-border hover:bg-muted',
                   color === opt.value &&
-                    'border-neutral-900 bg-neutral-900 text-white hover:bg-neutral-900',
+                    'border-primary bg-primary text-primary-foreground hover:bg-primary',
                 )}
               >
                 <RadioGroupItem
@@ -126,7 +126,7 @@ export function LeftSidebar({
 
         <section className="space-y-3">
           <span className={SECTION_LABEL}>Coach</span>
-          <div className="inline-flex w-full rounded-md bg-neutral-100 p-1">
+          <div className="inline-flex w-full rounded-md bg-muted p-1">
             {COACH_MODES.map((m) => (
               <Button
                 key={m.value}
@@ -138,7 +138,7 @@ export function LeftSidebar({
                   'flex-1 rounded-[6px] text-xs font-medium',
                   coachMode === m.value
                     ? 'shadow-sm'
-                    : 'text-neutral-600 hover:bg-white hover:text-neutral-900',
+                    : 'text-muted-foreground hover:bg-card hover:text-foreground',
                 )}
               >
                 {m.label}
@@ -196,7 +196,7 @@ export function LeftSidebar({
           </Button>
         </section>
 
-        <div className="flex items-center gap-2 pt-1 text-xs text-neutral-500">
+        <div className="flex items-center gap-2 pt-1 text-xs text-muted-foreground">
           <span
             className={cn(
               'relative inline-flex h-2 w-2 rounded-full',

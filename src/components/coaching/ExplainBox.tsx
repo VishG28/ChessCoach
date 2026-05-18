@@ -19,10 +19,10 @@ export function ExplainBox({ text, source, loading, error, onRegenerate }: Expla
   if (loading) {
     return (
       <div className="space-y-1.5">
-        <div className="h-3 w-3/4 rounded bg-neutral-200 animate-pulse" />
-        <div className="h-3 w-5/6 rounded bg-neutral-200 animate-pulse" />
-        <div className="h-3 w-2/3 rounded bg-neutral-200 animate-pulse" />
-        <div className="text-[0.65rem] uppercase tracking-wider text-neutral-400 mt-1">Coaching…</div>
+        <div className="h-3 w-3/4 rounded bg-muted animate-pulse" />
+        <div className="h-3 w-5/6 rounded bg-muted animate-pulse" />
+        <div className="h-3 w-2/3 rounded bg-muted animate-pulse" />
+        <div className="text-[0.65rem] uppercase tracking-wider text-muted-foreground mt-1">Coaching…</div>
       </div>
     )
   }
@@ -35,7 +35,7 @@ export function ExplainBox({ text, source, loading, error, onRegenerate }: Expla
       <p className="text-sm leading-snug">{text}</p>
       <div className="flex items-center gap-2 text-[0.65rem]">
         {source && (
-          <span className="rounded-full border border-neutral-200 bg-neutral-50 px-2 py-0.5 font-semibold uppercase tracking-wider text-neutral-600">
+          <span className="rounded-full border border-border bg-muted px-2 py-0.5 font-semibold uppercase tracking-wider text-muted-foreground">
             {SOURCE_LABEL[source]}
           </span>
         )}

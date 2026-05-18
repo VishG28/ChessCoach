@@ -33,11 +33,11 @@ function MoveCell({
   selected: boolean
   onClick: () => void
 }) {
-  if (!move) return <td className="px-2 py-1 text-zinc-300 w-28" />
+  if (!move) return <td className="px-2 py-1 text-muted-foreground/50 w-28" />
   return (
     <td
       className={`px-2 py-1 cursor-pointer rounded transition-colors w-28 ${
-        selected ? 'bg-zinc-200 font-semibold' : 'hover:bg-zinc-100'
+        selected ? 'bg-accent font-semibold' : 'hover:bg-muted'
       }`}
       onClick={onClick}
     >
@@ -71,7 +71,7 @@ export function MoveList({ moves, selectedPly, onSelectPly }: MoveListProps) {
 
   if (pairs.length === 0) {
     return (
-      <div className="p-4 text-sm text-zinc-500 italic">No moves recorded.</div>
+      <div className="p-4 text-sm text-muted-foreground italic">No moves recorded.</div>
     )
   }
 
@@ -80,8 +80,8 @@ export function MoveList({ moves, selectedPly, onSelectPly }: MoveListProps) {
       <table className="w-full text-left border-collapse">
         <tbody>
           {pairs.map(({ white, black, moveNumber }) => (
-            <tr key={moveNumber} className="border-b border-zinc-100">
-              <td className="px-2 py-1 text-xs text-zinc-400 w-8 select-none">
+            <tr key={moveNumber} className="border-b border-border">
+              <td className="px-2 py-1 text-xs text-muted-foreground w-8 select-none">
                 {moveNumber}.
               </td>
               <MoveCell

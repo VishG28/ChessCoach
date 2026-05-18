@@ -96,19 +96,19 @@ export function RightSidebar({
 
       <CardContent className="space-y-4">
         <section className="space-y-2">
-          <div className="flex items-center justify-between text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-neutral-500">
+          <div className="flex items-center justify-between text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
             <span>Evaluation</span>
             <span
               className={cn(
                 'font-mono text-sm tabular-nums',
-                evalFavorsWhite ? 'text-neutral-900' : 'text-neutral-500',
+                evalFavorsWhite ? 'text-foreground' : 'text-muted-foreground',
               )}
             >
               {evalLabel}
             </span>
           </div>
           <div
-            className="relative h-3 overflow-hidden rounded-full bg-neutral-900 ring-1 ring-inset ring-black/10"
+            className="relative h-3 overflow-hidden rounded-full bg-foreground ring-1 ring-inset ring-black/10"
             role="meter"
             aria-label="Position evaluation, White's share"
             aria-valuemin={0}
@@ -119,29 +119,29 @@ export function RightSidebar({
               className="absolute inset-y-0 right-0 bg-white"
               style={{ width: `${whitePct}%` }}
             />
-            <div className="pointer-events-none absolute left-1/2 top-0 h-full w-px bg-neutral-400/40" />
+            <div className="pointer-events-none absolute left-1/2 top-0 h-full w-px bg-muted-foreground/40" />
           </div>
         </section>
 
         <Separator />
 
         <section className="space-y-2">
-          <span className="text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-neutral-500">
+          <span className="text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
             Moves
           </span>
-          <ScrollArea className="h-[480px] rounded-md border border-neutral-100">
+          <ScrollArea className="h-[480px] rounded-md border border-border">
             {pairs.length === 0 ? (
-              <p className="px-3 py-6 text-center text-sm text-neutral-400">
+              <p className="px-3 py-6 text-center text-sm text-muted-foreground">
                 Make a move to start.
               </p>
             ) : (
-              <ol className="divide-y divide-neutral-100">
+              <ol className="divide-y divide-border">
                 {pairs.map((pair) => (
                   <li
                     key={pair.number}
                     className="grid grid-cols-[2.25rem_1fr_1fr] items-center gap-1 px-3 py-1.5 font-mono text-sm"
                   >
-                    <span className="text-xs font-medium text-neutral-400 tabular-nums">
+                    <span className="text-xs font-medium text-muted-foreground tabular-nums">
                       {pair.number}.
                     </span>
                     <PlyCell
@@ -180,7 +180,7 @@ interface PlyCellProps {
 
 function PlyCell({ move, ply, activePly, sourceInfo }: PlyCellProps) {
   if (move == null || ply == null) {
-    return <span className="text-neutral-300">·</span>
+    return <span className="text-muted-foreground">·</span>
   }
   const isActive = activePly === ply
   const isBook = sourceInfo?.source === 'book'
@@ -190,8 +190,8 @@ function PlyCell({ move, ply, activePly, sourceInfo }: PlyCellProps) {
       className={cn(
         'rounded px-1.5 py-0.5 text-left transition-colors',
         isActive
-          ? 'bg-neutral-900 text-white'
-          : 'text-neutral-800 hover:bg-neutral-100',
+          ? 'bg-foreground text-background'
+          : 'text-foreground hover:bg-muted',
       )}
       data-ply={ply}
     >

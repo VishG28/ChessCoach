@@ -75,7 +75,7 @@ export function EvalGraph({ moves, selectedPly, onSelectPly }: EvalGraphProps) {
 
   if (data.length <= 1) {
     return (
-      <div className="h-28 flex items-center justify-center text-sm text-zinc-400 italic">
+      <div className="h-28 flex items-center justify-center text-sm text-muted-foreground italic">
         No evaluation data yet.
       </div>
     )

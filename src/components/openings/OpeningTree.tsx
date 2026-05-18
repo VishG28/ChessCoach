@@ -57,14 +57,14 @@ function NodeRow({
           'flex items-center gap-1.5 py-0.5 rounded text-sm w-full text-left transition-colors',
           depth === 0 && 'font-medium',
           isCurrent
-            ? 'bg-zinc-200 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100'
-            : 'hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300',
+            ? 'bg-accent text-foreground'
+            : 'hover:bg-muted text-muted-foreground hover:text-foreground',
           !isLeaf && 'cursor-default',
           isLeaf && 'cursor-pointer',
         )}
         style={{ paddingLeft: `${8 + depth * 16}px`, paddingRight: '8px' }}
       >
-        <span className="font-mono text-xs text-zinc-400 w-3 shrink-0">
+        <span className="font-mono text-xs text-muted-foreground w-3 shrink-0">
           {depth > 0 && '·'}
         </span>
         <span className={cn('flex-1', isMastered && 'line-through opacity-60')}>
@@ -76,7 +76,7 @@ function NodeRow({
           </span>
         )}
         {isLeaf && !isMastered && (
-          <span className="text-zinc-400 text-xs" title="Drill this line">
+          <span className="text-muted-foreground text-xs" title="Drill this line">
             →
           </span>
         )}
@@ -107,7 +107,7 @@ export function OpeningTree({ opening, currentNodeId, onGoToLine }: OpeningTreeP
 
   return (
     <div className="select-none">
-      <div className="text-xs font-semibold uppercase tracking-wide text-zinc-500 mb-2 px-2">
+      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2 px-2">
         Opening Tree
       </div>
       <NodeRow
