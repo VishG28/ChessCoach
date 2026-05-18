@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { Board } from '@/components/board/Board'
 import { CapturedPieces } from '@/components/board/CapturedPieces'
 import { BoardActionBar } from '@/components/board/BoardActionBar'
+import { MoveNavBar } from '@/components/board/MoveNavBar'
 import { CoachPanel } from '@/components/coaching/CoachPanel'
 import { EngineSelector, getDefaultEngine } from '@/components/coaching/EngineSelector'
 import {
@@ -27,6 +28,8 @@ import { getGame, finalizeGame, clearGameCoaching } from '@/games/gameStore'
 import { useDeepCoach, uciPvToSan, uciToSan, type LiveCoachMessage } from '@/coaching/useDeepCoach'
 import type { CandidateLine, CoachingStyle, PreMoveContext } from '@/coaching/deepCoach'
 import { useShortcut } from '@/lib/shortcuts'
+import { fenAtPly, lastMoveAtPly } from '@/lib/historyNavigation'
+import { cn } from '@/lib/utils'
 import type { MoveSourceInfo } from '@/components/sidebar/RightSidebar'
 import { requestOpponentMove, type OpponentMode } from '@/engine/opponentEngine'
 import { loadMaiaModel, maiaModelName, selectMaiaModel } from '@/engine/maia'
@@ -235,6 +238,45 @@ export function PlayPage() {
     () => new Map(),
   )
 
+  // Ref used by both the engine useEffect (to discard stale searches) and the
+  // in-game review handlers (to invalidate an in-flight reply when the user
+  // starts scrubbing). Declared early so callbacks below can capture it.
+  const engineRequestIdRef = useRef(0)
+
+  // In-game history review: null = at live position; number = displaying the
+  // position AFTER this many plies have been played (0 = starting position,
+  // game.history.length = live). Read-only — never mutates the actual game.
+  const [reviewedPly, setReviewedPly] = useState<number | null>(null)
+  const totalPlies = game.history.length
+  const displayedPly = reviewedPly ?? totalPlies
+  const isReviewing = reviewedPly !== null
+
+  const goToPly = useCallback(
+    (next: number) => {
+      const clamped = Math.max(0, Math.min(totalPlies, next))
+      if (clamped !== totalPlies) {
+        // Entering or staying in review mode: invalidate any in-flight engine
+        // search so its async reply does not land while the user is scrubbing.
+        engineRequestIdRef.current++
+      }
+      setReviewedPly(clamped === totalPlies ? null : clamped)
+    },
+    [totalPlies],
+  )
+
+  const handleReturnToLive = useCallback(() => setReviewedPly(null), [])
+
+  // Defensive: if history shrinks (takeback / new game / FEN load) clear review.
+  // Setting state directly in an effect here is intentional state synchronization
+  // and only fires in the rare race between an external history mutation and the
+  // user's stale review index.
+  useEffect(() => {
+    if (reviewedPly !== null && reviewedPly > totalPlies) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setReviewedPly(null)
+    }
+  }, [reviewedPly, totalPlies])
+
   // Log every move to persistent game storage with background analysis
   const { appendCoachMessage, currentGameId } = useGameLogger({
     game,
@@ -271,6 +313,7 @@ export function PlayPage() {
 
   // Pre-move coaching: fire when it becomes the user's turn
   useEffect(() => {
+    if (isReviewing) return
     if (game.isGameOver) return
     if (game.turn !== userColor) return
     if (coachMode !== 'full' || !hasKey) return
@@ -325,7 +368,7 @@ export function PlayPage() {
       preMove: ctx,
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [game.fen, game.turn, game.isGameOver, coachMode, hasKey, coachingStyle])
+  }, [game.fen, game.turn, game.isGameOver, coachMode, hasKey, coachingStyle, isReviewing])
 
   // Tell Me More handler
   const handleTellMore = useCallback((messageId: string) => {
@@ -345,10 +388,11 @@ export function PlayPage() {
     setCoachMode('warnings')
   }, [])
 
-  // Engine plays the opposite color. Use a request-id ref to discard stale
-  // bestmoves if the position changes (takeback, new game) mid-search.
-  const engineRequestIdRef = useRef(0)
+  // Engine plays the opposite color. The request-id ref (declared earlier so
+  // review handlers can also invalidate in-flight searches) discards stale
+  // bestmoves if the position changes (takeback, new game, review).
   useEffect(() => {
+    if (isReviewing) return
     if (!engine || !ready) return
     if (game.isGameOver) return
     const engineColor: Color = userColor === 'w' ? 'b' : 'w'
@@ -460,7 +504,7 @@ export function PlayPage() {
     // including it would loop. The fields we read (fen/turn/isGameOver) are
     // in deps; makeMove is stable in behavior even though its identity isn't.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [engine, ready, game.fen, game.turn, game.isGameOver, userColor, elo, engineMode])
+  }, [engine, ready, game.fen, game.turn, game.isGameOver, userColor, elo, engineMode, isReviewing])
 
   const handleUserMove = (
     from: string,
@@ -480,6 +524,7 @@ export function PlayPage() {
     deepCoach.cancel()
     lastOpponentMetaRef.current = null
     setMoveSources(new Map())
+    setReviewedPly(null)
 
     // Abandonment: if the previous game exists and is still ongoing, finalize
     // it as a draw and (unless opted in) clear its coaching before the reset.
@@ -507,6 +552,7 @@ export function PlayPage() {
     coach.dismissAlert()
     deepCoach.cancel()
     lastOpponentMetaRef.current = null
+    setReviewedPly(null)
     // If it's currently the user's turn, the last ply was the engine's reply
     // to the user's blunder; undo both. If it's the engine's turn, only the
     // user's most recent move has been played; undo just that.
@@ -550,6 +596,14 @@ export function PlayPage() {
     window.dispatchEvent(new Event('cc:open-api-key')),
   )
 
+  // In-game move navigation shortcuts. These only fire on the live PlayPage
+  // (GameReviewPage has its own bindings) and are skipped automatically when
+  // the user is typing in an input thanks to useShortcut's default behavior.
+  useShortcut('arrowleft', () => goToPly(displayedPly - 1))
+  useShortcut('arrowright', () => goToPly(displayedPly + 1))
+  useShortcut('home', () => goToPly(0))
+  useShortcut('end', handleReturnToLive)
+
   // Eval bar wants White-POV centipawns. EngineEval.cp is from side-to-move
   // POV at the evaluated FEN, which (for liveEval) corresponds to game.turn.
   const evalCpWhitePov =
@@ -567,6 +621,44 @@ export function PlayPage() {
 
   const activePly = game.history.length - 1
 
+  // While reviewing, render the past position instead of the live one. We do
+  // NOT touch the underlying chess.js game — only what the user sees.
+  const displayedFen = isReviewing
+    ? fenAtPly(game.history, reviewedPly!)
+    : game.fen
+  const displayedLastMove = isReviewing
+    ? lastMoveAtPly(game.history, reviewedPly!)
+    : game.lastMove
+  // Empty dests map makes chessground reject all drag attempts silently.
+  const emptyDests = useMemo(() => new Map<Square, Square[]>(), [])
+  const displayedDests = isReviewing ? emptyDests : game.dests
+
+  // Highlight the move that *produced* the displayed position in the move list
+  // (i.e. the last ply played, which is displayedPly - 1 as a 0-based index).
+  const highlightedMovePly = displayedPly > 0 ? displayedPly - 1 : null
+
+  // Eval at the reviewed ply comes from the persisted gameStore, which the
+  // background analyzer fills in as moves are played. Live eval bypasses this.
+  // `totalPlies` is included so the memo recomputes after each new move (and
+  // its async analysis) is persisted to the store.
+  const reviewedEvalCpWhitePov = useMemo<number | null>(() => {
+    if (!isReviewing || !currentGameId || reviewedPly === null || reviewedPly === 0) {
+      return null
+    }
+    void totalPlies
+    const g = getGame(currentGameId)
+    const entry = g?.moves[reviewedPly - 1]
+    const ev = entry?.engine_eval_after
+    if (!ev || !entry) return null
+    // engine_eval_after.cp is from side-to-move POV at fen_after. The side to
+    // move at fen_after is the OPPOSITE of entry.side (the side that just
+    // moved). White POV: side === 'w' ? -cp : +cp.
+    return entry.side === 'w' ? -ev.cp : ev.cp
+  }, [isReviewing, reviewedPly, currentGameId, totalPlies])
+
+  const displayedEvalCpWhitePov = isReviewing ? reviewedEvalCpWhitePov : evalCpWhitePov
+  const displayedMateIn = isReviewing ? null : mateInWhitePov
+
   // Compute board arrow shapes from current eval + settings.
   const enoughMoves = game.history.length >= 4
   const userTurn = game.turn === userColor
@@ -574,18 +666,23 @@ export function PlayPage() {
   const userColorStr = userColor === 'w' ? 'white' : 'black'
 
   const bestArrow: DrawShape | null =
-    arrowsMaster && arrowsBest && enoughMoves && userTurn && liveEval?.candidates?.[0]
+    !isReviewing &&
+    arrowsMaster &&
+    arrowsBest &&
+    enoughMoves &&
+    userTurn &&
+    liveEval?.candidates?.[0]
       ? bestMoveShape(liveEval.candidates[0])
       : null
 
   const threatArrows: DrawShape[] =
-    arrowsMaster && arrowsThreats && enoughMoves && userColor
+    !isReviewing && arrowsMaster && arrowsThreats && enoughMoves && userColor
       ? threatShapes(game.fen, userColorStr)
       : []
 
-  const shapes: DrawShape[] = [bestArrow, ...threatArrows].filter(
-    (s): s is DrawShape => Boolean(s),
-  )
+  const shapes: DrawShape[] = isReviewing
+    ? []
+    : [bestArrow, ...threatArrows].filter((s): s is DrawShape => Boolean(s))
 
   const coachFlags = {
     hasBestArrow: Boolean(bestArrow),
@@ -604,7 +701,7 @@ export function PlayPage() {
           onCoachModeChange={setCoachMode}
           onNewGame={handleNewGame}
           onTakeBack={handleTakeBack}
-          canTakeBack={game.history.length > 0}
+          canTakeBack={game.history.length > 0 && !isReviewing}
           engineStatus={ready ? 'ready' : 'loading'}
           coachingStyle={coachingStyle}
           onCoachingStyleChange={setCoachingStyle}
@@ -628,17 +725,32 @@ export function PlayPage() {
           side="opponent"
           userColor={userColor === 'w' ? 'white' : 'black'}
         />
-        <div className="rounded-lg bg-card p-3 shadow-lg">
+        <div
+          className={cn(
+            'rounded-lg bg-card p-3 shadow-lg transition-shadow',
+            isReviewing && 'ring-2 ring-primary/40',
+          )}
+          onPointerDownCapture={(e) => {
+            if (!isReviewing) return
+            const target = e.target as HTMLElement | null
+            if (target?.closest('piece')) {
+              toast('Return to live position to make a move', {
+                id: 'cc.review-blocked',
+                duration: 1800,
+              })
+            }
+          }}
+        >
           <Board
-            fen={game.fen}
+            fen={displayedFen}
             orientation={game.orientation}
             turn={game.turn}
             userColor={userColor === 'w' ? 'white' : 'black'}
-            dests={game.dests}
-            lastMove={game.lastMove}
-            inCheck={game.inCheck}
+            dests={displayedDests}
+            lastMove={displayedLastMove}
+            inCheck={isReviewing ? false : game.inCheck}
             onUserMove={handleUserMove}
-            allowPremoves={allowPremoves}
+            allowPremoves={allowPremoves && !isReviewing}
             onPremoveSet={(orig, dest) => setPremove({ from: orig, to: dest })}
             onPremoveUnset={cancelPremove}
             premoveFailSquare={premoveFailSquare}
@@ -648,35 +760,54 @@ export function PlayPage() {
         <BoardActionBar
           onFlip={() => game.setOrientation(game.orientation === 'white' ? 'black' : 'white')}
         />
+        <MoveNavBar
+          totalPlies={totalPlies}
+          displayedPly={displayedPly}
+          isReviewing={isReviewing}
+          onFirst={() => goToPly(0)}
+          onPrev={() => goToPly(displayedPly - 1)}
+          onNext={() => goToPly(displayedPly + 1)}
+          onLast={handleReturnToLive}
+          onReturnToLive={handleReturnToLive}
+        />
         <CapturedPieces
           history={game.history}
           side="user"
           userColor={userColor === 'w' ? 'white' : 'black'}
         />
-        <CoachPanel
-          mode={coachMode}
-          threats={coach.threats}
-          captures={coach.captures}
-          blunderAlert={coach.blunderAlert}
-          thinking={coach.thinking}
-          engineThinking={engineThinking}
-          onDismissAlert={coach.dismissAlert}
-          onTakeBackBlunder={handleTakeBack}
-          explain={explain}
-          messages={deepCoach.messages}
-          onTellMore={handleTellMore}
-          onQuieter={handleQuieter}
-          coachFlags={coachFlags}
-        />
+        <div
+          className={cn(
+            'w-full transition-opacity',
+            isReviewing && 'opacity-60 pointer-events-none',
+          )}
+          aria-hidden={isReviewing ? 'true' : undefined}
+        >
+          <CoachPanel
+            mode={coachMode}
+            threats={coach.threats}
+            captures={coach.captures}
+            blunderAlert={coach.blunderAlert}
+            thinking={coach.thinking}
+            engineThinking={engineThinking}
+            onDismissAlert={coach.dismissAlert}
+            onTakeBackBlunder={handleTakeBack}
+            explain={explain}
+            messages={deepCoach.messages}
+            onTellMore={handleTellMore}
+            onQuieter={handleQuieter}
+            coachFlags={coachFlags}
+          />
+        </div>
       </main>
 
       <aside className="space-y-4 md:sticky md:top-20 md:self-start">
         <RightSidebar
           history={game.history}
-          evalCpWhitePov={evalCpWhitePov}
-          mateIn={mateInWhitePov}
-          activePly={activePly >= 0 ? activePly : null}
+          evalCpWhitePov={displayedEvalCpWhitePov}
+          mateIn={displayedMateIn}
+          activePly={isReviewing ? highlightedMovePly : activePly >= 0 ? activePly : null}
           moveSources={moveSources}
+          onSelectPly={(plyIndex) => goToPly(plyIndex + 1)}
         />
       </aside>
 
