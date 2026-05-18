@@ -11,16 +11,17 @@ export interface OpeningSummary {
   popularityRank: number
 }
 
-const summaryModules = import.meta.glob<{ default: Opening }>(
+// Single eager glob — bundler decides whether to inline or split by chunk-size
+// heuristics. Total JSON payload for 50 placeholder openings is ~80 KB and is
+// expected to grow to ~500 KB once real generations land. Eager keeps it
+// straightforward; if bundle becomes an issue, switch this glob to lazy and
+// reconstruct summaries from a separate metadata file generated at build time.
+const openingModules = import.meta.glob<{ default: Opening }>(
   '../data/openings/*.json',
   { eager: true },
 )
 
-const lazyModules = import.meta.glob<{ default: Opening }>(
-  '../data/openings/*.json',
-)
-
-export const OPENING_SUMMARIES: OpeningSummary[] = Object.values(summaryModules)
+export const OPENING_SUMMARIES: OpeningSummary[] = Object.values(openingModules)
   .map((mod) => {
     const op = mod.default
     return {
@@ -36,10 +37,9 @@ export const OPENING_SUMMARIES: OpeningSummary[] = Object.values(summaryModules)
   .sort((a, b) => a.popularityRank - b.popularityRank)
 
 export async function loadOpening(id: string): Promise<Opening> {
-  const entry = Object.entries(lazyModules).find(([p]) => p.endsWith(`/${id}.json`))
+  const entry = Object.entries(openingModules).find(([p]) => p.endsWith(`/${id}.json`))
   if (!entry) throw new Error(`Unknown opening: ${id}`)
-  const mod = await entry[1]()
-  return parseOpening(mod.default) as unknown as Opening
+  return parseOpening(entry[1].default) as unknown as Opening
 }
 
 /** Back-compat shim used by OpeningsPage/useOpeningTrainer. */
