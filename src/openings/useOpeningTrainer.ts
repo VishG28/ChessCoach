@@ -106,7 +106,7 @@ function advanceEngine(
   drillMode: boolean,
   lastMoveRef: React.MutableRefObject<[string, string] | null>,
 ): TrainerState {
-  const userIsWhite = opening.userColor === 'white'
+  const userIsWhite = opening.userColor! === 'white'
   const currentTurnIsWhite = chess.turn() === 'w'
   const isUserTurn = userIsWhite === currentTurnIsWhite
 
@@ -161,7 +161,7 @@ function advanceEngine(
 
 function makeInitialChess(opening: Opening): Chess {
   const c = new Chess()
-  c.load(opening.startFen)
+  c.load(opening.startFen!)
   return c
 }
 
@@ -192,7 +192,7 @@ export function useOpeningTrainer(): UseOpeningTrainerReturn {
     lastMoveRef.current = null
     const targetLeaf = state.drillMode ? pickRandomUnmastered(opening) : null
     const next = advanceEngine(
-      opening.root,
+      opening.root!,
       c,
       opening,
       targetLeaf?.id ?? null,
@@ -243,7 +243,7 @@ export function useOpeningTrainer(): UseOpeningTrainerReturn {
     lastMoveRef.current = null
     const targetLeaf = drillMode ? pickRandomUnmastered(opening) : null
     const next = advanceEngine(
-      opening.root,
+      opening.root!,
       c,
       opening,
       targetLeaf?.id ?? null,
@@ -280,7 +280,7 @@ export function useOpeningTrainer(): UseOpeningTrainerReturn {
   // Derived values
   const chess = chessRef.current
   const fen = chess.fen()
-  const userIsWhite = state.opening.userColor === 'white'
+  const userIsWhite = state.opening.userColor! === 'white'
   const currentTurnIsWhite = chess.turn() === 'w'
   const userToMove = userIsWhite === currentTurnIsWhite
 
@@ -303,8 +303,8 @@ export function useOpeningTrainer(): UseOpeningTrainerReturn {
     correctToSquares,
     progressFraction,
     dests,
-    userColor: state.opening.userColor,
-    orientation: state.opening.userColor,
+    userColor: state.opening.userColor!,
+    orientation: state.opening.userColor!,
     lastMove: lastMoveRef.current,
     selectOpening,
     tryUserMove,

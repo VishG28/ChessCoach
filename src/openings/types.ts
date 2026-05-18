@@ -15,17 +15,57 @@ export interface OpeningNode {
   children: OpeningNode[]
 }
 
-export interface Opening {
-  id: 'london' | 'caro-kann'
-  title: string
-  /** The color the USER plays. The other color makes book moves automatically. */
-  userColor: 'white' | 'black'
-  /** Starting FEN — standard chess starting position. */
-  startFen: string
-  /** Top-level description shown above the tree. */
+export interface OpeningMove {
+  san: string
+  uci: string
+  /** FEN AFTER the move */
+  fen: string
+  explanation: string
+}
+
+export interface OpeningVariation {
+  id: string
+  name: string
+  /** SAN from main-line position that branches here */
+  triggerMove: string
+  moves: OpeningMove[]
+  explanation: string
+}
+
+export interface AmateurResponse {
+  name: string
   description: string
-  /** Root has empty san/uci. Its children are the first moves (which side moves first depends on userColor). */
-  root: OpeningNode
+  moves: OpeningMove[]
+  refutation: string
+}
+
+export interface OpeningTrap {
+  name: string
+  description: string
+  moves: OpeningMove[]
+  lesson: string
+}
+
+export interface Opening {
+  id: string
+  name: string
+  eco: string
+  popularityRank: number
+  category: 'main_lines' | 'underrated'
+  side: 'white' | 'black' | 'both'
+  startingMoves: string[]
+  description: string
+  whyPlayIt: string
+  keyIdeas: string[]
+  mainLine: OpeningMove[]
+  variations: OpeningVariation[]
+  commonAmateurResponses: AmateurResponse[]
+  trapsToKnow: OpeningTrap[]
+  /** Back-compat for current OpeningTree / useOpeningTrainer. Derived via buildOpeningTree. */
+  title?: string
+  userColor?: 'white' | 'black'
+  startFen?: string
+  root?: OpeningNode
 }
 
 export interface LineProgress {
