@@ -1,7 +1,9 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { PIECE_SETS, type PieceSetId } from '@/styles/pieceSets'
+import { PIECE_URLS, PIECE_CODES } from '@/styles/pieceSets.module'
 import { loadPieceSet, savePieceSet } from '@/lib/pieceSetStorage'
+import '@/styles/pieceSets.css'
 
 interface Ctx { setId: PieceSetId; setSetId: (id: PieceSetId) => void }
 const PieceSetCtx = createContext<Ctx | null>(null)
@@ -12,6 +14,10 @@ function applyPieceSetClass(id: PieceSetId): void {
     root.classList.remove(`cg-piece-set-${key}`)
   }
   root.classList.add(`cg-piece-set-${id}`)
+  const urls = PIECE_URLS[id]
+  for (const code of PIECE_CODES) {
+    root.style.setProperty(`--cg-piece-${code}`, `url("${urls[code]}")`)
+  }
 }
 
 export function PieceSetProvider({ children }: { children: ReactNode }) {

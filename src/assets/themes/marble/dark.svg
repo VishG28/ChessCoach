@@ -1,0 +1,32 @@
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200' width='200' height='200'>
+  <!--
+    Marble dark square texture — Option A procedural SVG
+    Generator parameters (reproducible):
+      Base fill:      #5C6B58  (sage/slate green — palette[7])
+      Turbulence:     type=fractalNoise, baseFrequency="0.022 0.04", numOctaves=4, seed=19
+      Vein color:     darker sage-grey tones via feColorMatrix
+      Blend:          feBlend mode=multiply
+    Visual intent:   Dark Verde Alpi-style marble — sage ground with darker green-grey veining
+  -->
+  <defs>
+    <filter id='marble-dark' x='0%' y='0%' width='100%' height='100%' color-interpolation-filters='sRGB'>
+      <feTurbulence type='fractalNoise' baseFrequency='0.022 0.04' numOctaves='4' seed='19' result='noise1'/>
+      <feColorMatrix in='noise1' type='matrix'
+        values='0.12 0 0 0 0.55
+                0.15 0 0 0 0.60
+                0.12 0 0 0 0.50
+                0    0 0 1 0'
+        result='tinted1'/>
+      <feTurbulence type='fractalNoise' baseFrequency='0.065 0.09' numOctaves='3' seed='23' result='noise2'/>
+      <feColorMatrix in='noise2' type='matrix'
+        values='0.08 0 0 0 0.28
+                0.10 0 0 0 0.32
+                0.08 0 0 0 0.26
+                0    0 0 0.5 0'
+        result='tinted2'/>
+      <feBlend in='tinted1' in2='tinted2' mode='multiply' result='veins'/>
+      <feBlend in='SourceGraphic' in2='veins' mode='multiply' result='final'/>
+    </filter>
+  </defs>
+  <rect width='200' height='200' fill='#5C6B58' filter='url(#marble-dark)'/>
+</svg>
