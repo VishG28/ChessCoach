@@ -9,6 +9,7 @@ const LINKS = [
   { to: '/', label: 'Play' },
   { to: '/games', label: 'Review' },
   { to: '/openings', label: 'Openings' },
+  { to: '/repertoire', label: 'Repertoire' },
   ...(import.meta.env.DEV ? [{ to: '/calibrate', label: 'Calibrate' }] : []),
 ]
 
@@ -22,7 +23,7 @@ export function TopNav() {
             <NavLink
               key={to}
               to={to}
-              end={to === '/'}
+              end={to === '/' || to === '/openings'}
               className={({ isActive }) =>
                 cn(
                   'px-3 py-1.5 rounded-md text-sm transition-colors',

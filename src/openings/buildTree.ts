@@ -40,7 +40,7 @@ export function buildOpeningTree(o: Opening): {
     let parent: OpeningNode | null = root
     // Walk the main line until we find a node whose first child has the trigger SAN
     while (parent && parent.children.length > 0) {
-      const next = parent.children[0]
+      const next: OpeningNode = parent.children[0]!
       if (next.san === variation.triggerMove) break
       parent = next
     }

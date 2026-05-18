@@ -165,8 +165,8 @@ function makeInitialChess(opening: Opening): Chess {
   return c
 }
 
-export function useOpeningTrainer(): UseOpeningTrainerReturn {
-  const firstOpening = OPENINGS[0]!
+export function useOpeningTrainer(initialOpening?: Opening): UseOpeningTrainerReturn {
+  const firstOpening = initialOpening ?? OPENINGS[0]!
   const chessRef = useRef<Chess>(makeInitialChess(firstOpening))
   const lastMoveRef = useRef<[string, string] | null>(null)
   const hintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -174,7 +174,7 @@ export function useOpeningTrainer(): UseOpeningTrainerReturn {
   const [state, setState] = useState<TrainerState>(() => {
     // If engine goes first (user is black), advance engine from root
     return advanceEngine(
-      firstOpening.root,
+      firstOpening.root!,
       chessRef.current,
       firstOpening,
       null,
@@ -273,7 +273,7 @@ export function useOpeningTrainer(): UseOpeningTrainerReturn {
     const c = makeInitialChess(opening)
     chessRef.current = c
     lastMoveRef.current = null
-    const next = advanceEngine(opening.root, c, opening, leafId, false, true, lastMoveRef)
+    const next = advanceEngine(opening.root!, c, opening, leafId, false, true, lastMoveRef)
     setState({ ...next, drillMode: true, targetLeafId: leafId })
   }, [state])
 
