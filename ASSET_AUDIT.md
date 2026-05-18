@@ -143,3 +143,34 @@ Vite does **not** rewrite absolute `url('/...')` references in CSS or string-lit
 - **standard** (cburnett SVGs) — 12 × 404, but chessground ships a bundled cburnett fallback that kicks in silently, masking the failure
 
 **Board themes affected:** None. All board themes use CSS variables, runtime data-URL SVGs (marble), or CSS gradients (wood) — no external file paths. Marble visual fidelity (flat tiles vs. stone texture) is a separate concern handled in Phase D.
+
+---
+
+## Fix Verification (post-fix)
+
+**Fix applied:** Task A2 — commit `8a8770b`
+
+- Moved `public/pieces/**` → `src/assets/pieces/**` via `git mv` (48 SVGs)
+- Created `src/styles/pieceSets.module.ts` with all 48 ES-module imports (4 sets × 12 pieces)
+- Rewrote `src/styles/pieceSets.css` from 48 hardcoded `url('/...')` rules to 12 CSS variable rules (`var(--cg-piece-<code>)`)
+- Patched `src/components/board/PieceSetProvider.tsx` to inject `--cg-piece-*` CSS variables and import `pieceSets.css`
+- Patched `src/styles/pieceSets.ts` to use `PIECE_URLS.*.wK` for preview values
+
+**Post-fix audit result:**
+
+```json
+[]
+```
+
+Zero 404s. All piece SVGs now load from `/ChessCoach/assets/<hash>.svg` (Vite-hashed, base-prefixed).
+Example observed request: `GET /ChessCoach/assets/wK-By60gHvb.svg → 200`
+
+**Vitest regression test:** `src/styles/pieceSets.test.ts` — PASS
+
+**Build:** `npm run build` exits 0.
+
+**Pre/post 404 count summary:**
+| State | 404 count (audit script) | Full production impact |
+|-------|--------------------------|------------------------|
+| Pre-fix | 4 (one per set) | ~36+ per page load |
+| Post-fix | 0 | 0 |
