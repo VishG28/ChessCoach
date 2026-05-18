@@ -23,9 +23,11 @@ ChessCoach supports two opponent engine modes:
 - **Maia (default)** - a neural network trained on millions of human Lichess
   games at specific rating buckets. Mistakes are the kind a real player at
   that level would make: misjudging a tactic, missing a counterattack,
-  developing a piece to the wrong square. Five models cover Elo 1100, 1300,
-  1500, 1700, 1900 and are downloaded lazily (~3.5MB each, cached after first
-  load).
+  developing a piece to the wrong square. Nine models cover Elo 1100, 1200,
+  1300, 1400, 1500, 1600, 1700, 1800, and 1900 (the full
+  [CSSLab Maia-1](https://github.com/CSSLab/maia-chess) lineup) and are
+  downloaded lazily (~3.5MB each, cached after first load). Your Elo setting
+  snaps to the nearest 100 to pick which model plays.
 - **Stockfish (calibrated)** - Stockfish 18 with depth, MultiPV, and
   random-move chance dialed to a target Elo. Always available, no download.
 

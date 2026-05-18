@@ -34,6 +34,33 @@ test('resolveEngine at 1899 → Maia 1900 (highest Maia bucket)', () => {
   assert.equal(r.maiaModel, 1900)
 })
 
+test('resolveEngine nearest-100 bucketing covers all 9 Maia models', () => {
+  // Each exact-100 Elo in the Maia range should resolve to itself.
+  for (const e of [1100, 1200, 1300, 1400, 1500, 1600, 1700, 1800]) {
+    const r = resolveEngine(e)
+    assert.equal(r.source, 'maia', `Elo ${e} should route to Maia`)
+    assert.equal(r.maiaModel, e, `Elo ${e} should pick Maia ${e}`)
+  }
+  // 1900 is the Stockfish threshold, not a Maia bucket at runtime.
+  assert.equal(resolveEngine(1900).source, 'stockfish')
+})
+
+test('resolveEngine ties round up (1150 → 1200, 1250 → 1300, etc.)', () => {
+  assert.equal(resolveEngine(1150).maiaModel, 1200)
+  assert.equal(resolveEngine(1250).maiaModel, 1300)
+  assert.equal(resolveEngine(1450).maiaModel, 1500)
+  assert.equal(resolveEngine(1750).maiaModel, 1800)
+  assert.equal(resolveEngine(1850).maiaModel, 1900)
+})
+
+test('resolveEngine off-tick Elos snap to nearest 100', () => {
+  assert.equal(resolveEngine(1149).maiaModel, 1100)
+  assert.equal(resolveEngine(1251).maiaModel, 1300)
+  assert.equal(resolveEngine(1349).maiaModel, 1300)
+  assert.equal(resolveEngine(1649).maiaModel, 1600)
+  assert.equal(resolveEngine(1751).maiaModel, 1800)
+})
+
 test('resolveEngine at 1900 → Stockfish depth 10', () => {
   const r = resolveEngine(STOCKFISH_THRESHOLD)
   assert.equal(r.source, 'stockfish')

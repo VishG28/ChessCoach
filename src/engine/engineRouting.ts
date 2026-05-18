@@ -13,7 +13,16 @@ export const SF_UCI_ELO_MIN = 1320
 export const SF_UCI_ELO_MAX = 2850
 export const SF_DEFAULT_MOVETIME_MS = 1000
 
-export type MaiaModelElo = 1100 | 1300 | 1500 | 1700 | 1900
+export type MaiaModelElo =
+  | 1100
+  | 1200
+  | 1300
+  | 1400
+  | 1500
+  | 1600
+  | 1700
+  | 1800
+  | 1900
 
 export interface ResolvedEngine {
   source: 'maia' | 'stockfish'
@@ -32,13 +41,27 @@ function clamp(n: number, lo: number, hi: number): number {
  * Mirrors `selectMaiaModel` in `./maia`. Inlined here so this module stays
  * importable from Node test runners (the Maia facade reads
  * `import.meta.env.BASE_URL` at module load, which is Vite-only).
+ *
+ * Buckets to the nearest 100 within [1100, 1900]. Ties round up (e.g. 1150
+ * → 1200).
  */
+const MAIA_BUCKETS_INTERNAL: ReadonlyArray<MaiaModelElo> = [
+  1100, 1200, 1300, 1400, 1500, 1600, 1700, 1800, 1900,
+]
+
 function bucketMaiaModel(elo: number): MaiaModelElo {
-  if (elo < 1200) return 1100
-  if (elo < 1400) return 1300
-  if (elo < 1600) return 1500
-  if (elo < 1800) return 1700
-  return 1900
+  if (elo <= 1100) return 1100
+  if (elo >= 1900) return 1900
+  let best: MaiaModelElo = MAIA_BUCKETS_INTERNAL[0]
+  let bestDist = Math.abs(elo - best)
+  for (const b of MAIA_BUCKETS_INTERNAL) {
+    const d = Math.abs(elo - b)
+    if (d <= bestDist) {
+      best = b
+      bestDist = d
+    }
+  }
+  return best
 }
 
 /**
@@ -97,4 +120,15 @@ export function skillDescription(elo: number): string {
   return band.label
 }
 
+/**
+ * Major ticks — rendered with labels under the slider. Kept sparse so the
+ * numeric labels don't overlap on narrow viewports.
+ */
 export const ELO_TICKS: ReadonlyArray<number> = [1100, 1300, 1500, 1700, 1900, 2100, 2400]
+
+/**
+ * Minor ticks — rendered as tick marks only (no label). These fill in the
+ * Maia range at 100-Elo spacing so the slider's hashes reflect every
+ * shipped Maia model without crowding the labels.
+ */
+export const ELO_MINOR_TICKS: ReadonlyArray<number> = [1200, 1400, 1600, 1800]

@@ -1,6 +1,6 @@
 # Maia ONNX models
 
-These five `.onnx` files are Leela-format ONNX exports of the original Maia
+These nine `.onnx` files are Leela-format ONNX exports of the original Maia
 networks from the [CSSLab/maia-chess](https://github.com/CSSLab/maia-chess)
 project (KDD 2020). They were obtained pre-converted from the
 [`lczerolens`](https://huggingface.co/lczerolens) Hugging Face organization,
@@ -12,9 +12,13 @@ which maintains ONNX dumps produced by the
 | File              | Size | Source |
 | ----------------- | ---- | ------ |
 | `maia-1100.onnx`  | 3.5 MB | https://huggingface.co/lczerolens/maia-1100/resolve/main/model.onnx |
+| `maia-1200.onnx`  | 3.5 MB | https://huggingface.co/lczerolens/maia-1200/resolve/main/model.onnx |
 | `maia-1300.onnx`  | 3.5 MB | https://huggingface.co/lczerolens/maia-1300/resolve/main/model.onnx |
+| `maia-1400.onnx`  | 3.5 MB | https://huggingface.co/lczerolens/maia-1400/resolve/main/model.onnx |
 | `maia-1500.onnx`  | 3.5 MB | https://huggingface.co/lczerolens/maia-1500/resolve/main/model.onnx |
+| `maia-1600.onnx`  | 3.5 MB | https://huggingface.co/lczerolens/maia-1600/resolve/main/model.onnx |
 | `maia-1700.onnx`  | 3.5 MB | https://huggingface.co/lczerolens/maia-1700/resolve/main/model.onnx |
+| `maia-1800.onnx`  | 3.5 MB | https://huggingface.co/lczerolens/maia-1800/resolve/main/model.onnx |
 | `maia-1900.onnx`  | 3.5 MB | https://huggingface.co/lczerolens/maia-1900/resolve/main/model.onnx |
 
 ## Architecture
@@ -38,7 +42,7 @@ If the upstream Hugging Face files disappear:
 ```bash
 # 1. Download the original .pb.gz weights from CSSLab
 curl -LO https://github.com/CSSLab/maia-chess/releases/download/v1.0/maia-1100.pb.gz
-# (repeat for 1300, 1500, 1700, 1900)
+# (repeat for 1200, 1300, 1400, 1500, 1600, 1700, 1800, 1900)
 
 # 2. Install lczerolens (or use lc0 build with --onnx export)
 pip install lczerolens

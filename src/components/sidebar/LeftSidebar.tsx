@@ -24,6 +24,7 @@ import {
   ELO_MIN,
   ELO_MAX,
   ELO_TICKS,
+  ELO_MINOR_TICKS,
 } from '@/engine/engineRouting'
 import { RatingHelpModal } from '@/components/onboarding/RatingHelpModal'
 
@@ -147,6 +148,14 @@ export function LeftSidebar({
               }}
             />
             <div className="pointer-events-none relative mt-1 h-2">
+              {ELO_MINOR_TICKS.map((t) => (
+                <span
+                  key={`minor-${t}`}
+                  className="absolute top-0 h-1 w-px -translate-x-1/2 bg-muted-foreground/25"
+                  style={{ left: `${tickPercent(t)}%` }}
+                  aria-hidden="true"
+                />
+              ))}
               {ELO_TICKS.map((t) => (
                 <span
                   key={t}
