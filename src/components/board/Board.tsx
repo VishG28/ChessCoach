@@ -246,11 +246,10 @@ export function Board({
 
   return (
     // TODO(phase-6-touch): long-press to show attacks
-    <div style={{ position: 'relative', width: 560, height: 560 }}>
+    <div className="cc-board-square" style={{ position: 'relative' }}>
       <div
         ref={wrapRef}
         className="cg-wrap"
-        style={{ width: 560, height: 560 }}
       />
       {failOverlayStyle && <div style={failOverlayStyle} aria-hidden="true" />}
     </div>

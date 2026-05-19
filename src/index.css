@@ -215,3 +215,44 @@ body,
 }
 
 /* Board theme + piece-set rules live in src/styles/boardThemes.css and pieceSets.css. */
+
+/* ---- Mobile-fluid chessboard sizing (Phase B/C, mobile fix) ----
+   Replaces hardcoded 560px/480px board with viewport-aware sizing.
+   Aspect-ratio reserves a square; max-width prevents desktop overflow. */
+.cc-board-square {
+  width: 100%;
+  max-width: min(560px, calc(100vw - 2rem));
+  aspect-ratio: 1 / 1;
+  margin-inline: auto;
+}
+
+.cc-board-square--review {
+  max-width: min(480px, calc(100vw - 2rem));
+}
+
+.cc-board-square .cg-wrap {
+  width: 100%;
+  height: 100%;
+}
+
+/* Coordinate labels scale with the board. */
+.cc-board-square .cg-wrap coords coord {
+  font-size: 0.7em;
+}
+
+/* Flex/grid children that should not force horizontal overflow at narrow viewports. */
+.cc-board-column {
+  min-width: 0;
+}
+
+/* Mobile tap-target minimum (WCAG 2.2 AA / accessibility). */
+@media (max-width: 767px) {
+  button,
+  [role="button"],
+  a[role="link"],
+  input[type="range"]::-webkit-slider-thumb,
+  input[type="range"]::-moz-range-thumb {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}

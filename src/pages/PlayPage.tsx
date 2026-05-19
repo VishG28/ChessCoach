@@ -765,7 +765,7 @@ export function PlayPage() {
         />
       </aside>
 
-      <main className="flex flex-col items-center gap-4">
+      <main className="flex flex-col items-stretch gap-4 cc-board-column">
         <CapturedPieces
           history={game.history}
           side="opponent"
@@ -773,7 +773,7 @@ export function PlayPage() {
         />
         <div
           className={cn(
-            'rounded-lg bg-card p-3 shadow-lg transition-shadow',
+            'w-full rounded-lg bg-card p-3 shadow-lg transition-shadow',
             isReviewing && 'ring-2 ring-primary/40',
           )}
           onPointerDownCapture={(e) => {

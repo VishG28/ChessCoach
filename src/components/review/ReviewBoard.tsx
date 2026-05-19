@@ -46,10 +46,11 @@ export function ReviewBoard({ fen, orientation, lastMove }: ReviewBoardProps) {
   }, [fen, orientation, lastMove])
 
   return (
-    <div
-      ref={wrapRef}
-      className="cg-wrap"
-      style={{ width: 480, height: 480 }}
-    />
+    <div className="cc-board-square cc-board-square--review" style={{ position: 'relative' }}>
+      <div
+        ref={wrapRef}
+        className="cg-wrap"
+      />
+    </div>
   )
 }
