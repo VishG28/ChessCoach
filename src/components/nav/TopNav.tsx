@@ -17,7 +17,23 @@ export function TopNav() {
   return (
     <header className="sticky top-0 z-30 h-14 border-b bg-background/80 backdrop-blur">
       <div className="mx-auto flex h-full max-w-[1280px] items-center justify-between gap-4 px-6">
-        <div className="font-semibold tracking-tight">Chess Coach</div>
+        <a href="/" aria-label="Chess Coach" className="flex items-center">
+          <img
+            src={`${import.meta.env.BASE_URL}ChessCoachLogoLight.png`}
+            alt="Chess Coach"
+            width={780}
+            height={404}
+            className="block h-8 w-auto dark:hidden"
+          />
+          <img
+            src={`${import.meta.env.BASE_URL}ChessCoachLogoDark.png`}
+            alt=""
+            aria-hidden="true"
+            width={780}
+            height={404}
+            className="hidden h-8 w-auto dark:block"
+          />
+        </a>
         <nav className="hidden md:flex gap-1">
           {LINKS.map(({ to, label }) => (
             <NavLink
