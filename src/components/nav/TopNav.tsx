@@ -17,7 +17,7 @@ export function TopNav() {
   return (
     <header className="sticky top-0 z-30 h-14 border-b bg-background/80 backdrop-blur">
       <div className="mx-auto flex h-full max-w-[1280px] items-center justify-between gap-4 px-6">
-        <a href="/" aria-label="Chess Coach" className="flex items-center">
+        <a href="https://vishg28.github.io/ChessCoach/" aria-label="Chess Coach" className="flex items-center">
           <img
             src={`${import.meta.env.BASE_URL}ChessCoachLogoLight.png`}
             alt="Chess Coach"
